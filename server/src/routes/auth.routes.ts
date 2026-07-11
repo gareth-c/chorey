@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { nanoid } from "nanoid";
+import rateLimit from "express-rate-limit";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/types";
 import { db } from "../db/client";
 import { hashPassword, verifyPassword } from "../auth/password";
@@ -10,6 +11,17 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { getErrorMessage } from "../utils/errors";
 
 export const authRouter = Router();
+
+// Both are credential-verification endpoints (password / passkey signature),
+// so both get throttled per source IP — otherwise either is brute-forceable
+// with no cost to the attacker.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts. Try again in a few minutes." },
+});
 
 interface UserRow {
   id: string;
@@ -56,7 +68,7 @@ authRouter.get("/session", (req, res) => {
 const setupSchema = z.object({
   name: z.string().min(1).max(100),
   avatarEmoji: z.string().min(1).max(10).optional().default("🏠"),
-  password: z.string().min(4).max(200).optional(),
+  password: z.string().min(8).max(200).optional(),
 });
 
 authRouter.post("/setup", (req, res) => {
@@ -90,7 +102,7 @@ function getParentById(id: string): UserRow | undefined {
     | undefined;
 }
 
-authRouter.post("/login", (req, res) => {
+authRouter.post("/login", loginLimiter, (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -133,6 +145,7 @@ authRouter.post(
 
 authRouter.post(
   "/login/passkey/verify",
+  loginLimiter,
   asyncHandler(async (req, res) => {
     const { userId, response } = req.body as {
       userId?: string;

@@ -53,7 +53,7 @@ const createUserSchema = z
     name: z.string().min(1).max(100),
     avatarEmoji: z.string().min(1).max(10).optional().default("🙂"),
     role: z.enum(["parent", "child"]),
-    password: z.string().min(4).max(200).optional(),
+    password: z.string().min(8).max(200).optional(),
   })
   .refine((data) => data.role === "parent" || !data.password, {
     message: "Child profiles can't have a password — they sign in via their Child Portal link",
@@ -129,7 +129,7 @@ function requireParentTarget(req: Request, res: import("express").Response): Use
   return user;
 }
 
-const setPasswordSchema = z.object({ password: z.string().min(4).max(200) });
+const setPasswordSchema = z.object({ password: z.string().min(8).max(200) });
 
 usersRouter.post("/:id/password", (req, res) => {
   if (!requireParentTarget(req, res)) return;

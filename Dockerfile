@@ -24,6 +24,7 @@ RUN npm run build
 
 # --- final runtime image ---
 FROM node:20-alpine
+RUN apk add --no-cache su-exec
 WORKDIR /app
 
 ENV NODE_ENV=production \
@@ -37,9 +38,14 @@ COPY --from=client-build /app/client/dist ./public
 # Baked in at build time so GET /api/version matches exactly what's running.
 COPY version.json ./version.json
 
-RUN mkdir -p /app/data
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && mkdir -p /app/data && chown -R node:node /app
 
 EXPOSE 5152
 VOLUME ["/app/data"]
 
+# The entrypoint fixes /app/data ownership (it's typically a host bind
+# mount) and then drops from root to the unprivileged `node` user — the
+# app itself never runs as root.
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]
