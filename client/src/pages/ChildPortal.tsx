@@ -79,7 +79,7 @@ export default function ChildPortal() {
       />
       <button
         onClick={() => setShowParentSignIn(true)}
-        className="fixed bottom-4 right-4 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-slate-300 backdrop-blur hover:bg-white/20"
+        className="fixed bottom-4 right-4 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm hover:bg-slate-50 dark:border-white/15 dark:bg-white/10 dark:text-slate-300 dark:shadow-none dark:backdrop-blur dark:hover:bg-white/20"
       >
         Parent sign-in
       </button>

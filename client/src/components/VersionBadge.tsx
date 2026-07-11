@@ -34,7 +34,7 @@ export default function VersionBadge() {
   if (!label) return null;
 
   return (
-    <div className="pointer-events-none fixed bottom-2 right-2 z-50 select-none text-[10px] font-medium text-slate-400">
+    <div className="pointer-events-none fixed bottom-2 right-2 z-50 select-none text-[10px] font-medium text-slate-500 dark:text-slate-400">
       {label}
     </div>
   );

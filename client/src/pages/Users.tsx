@@ -117,10 +117,10 @@ export default function Users() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10 sm:px-10 sm:py-14">
-      <div className="mb-8 flex items-start justify-between border-b border-white/10 pb-6">
+      <div className="mb-8 flex items-start justify-between border-b border-slate-200 pb-6 dark:border-white/10">
         <div>
-          <h1 className="mb-1 text-2xl font-semibold text-white">Users</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="mb-1 text-2xl font-semibold text-slate-900 dark:text-white">Users</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Parents sign in to this management interface (password and/or passkey). Children have
             no login — they're reached only through their own Child Portal link.
           </p>
@@ -134,14 +134,14 @@ export default function Users() {
         {users.map((u) => (
           <div
             key={u.id}
-            className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 py-3 last:border-0"
+            className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 py-3 last:border-0 dark:border-white/10"
           >
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-xl">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-xl dark:bg-white/10">
                 {u.avatarEmoji}
               </span>
               <div>
-                <p className="text-sm font-medium text-white">{u.name}</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-white">{u.name}</p>
                 <p className="text-xs capitalize text-slate-400">{u.role}</p>
               </div>
             </div>
@@ -174,7 +174,9 @@ export default function Users() {
                   )}
                 </>
               ) : (
-                <span className="text-xs text-slate-400">Signs in via their Child Portal link</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Signs in via their Child Portal link
+                </span>
               )}
               {u.id !== currentUser?.id && (
                 <button className="btn-danger" onClick={() => handleDelete(u.id)}>
@@ -187,8 +189,10 @@ export default function Users() {
       </div>
 
       <div className="card mb-8">
-        <h2 className="mb-1 text-lg font-medium text-white">Import from a previous version</h2>
-        <p className="mb-4 text-sm text-slate-400">
+        <h2 className="mb-1 text-lg font-medium text-slate-900 dark:text-white">
+          Import from a previous version
+        </h2>
+        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
           Load a <code>chore-export.json</code> exported from an older Chore Tracker. This creates
           the children, their reward rules and Child Portal links, and re-adds every chore with its
           completion history. Importing again adds fresh copies rather than merging.
@@ -207,9 +211,11 @@ export default function Users() {
             disabled={importing}
           />
         </label>
-        {importError && <p className="mt-3 text-sm text-red-400">{importError}</p>}
+        {importError && (
+          <p className="mt-3 text-sm text-red-600 dark:text-red-400">{importError}</p>
+        )}
         {importSummary && (
-          <p className="mt-3 text-sm text-emerald-400">
+          <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">
             Imported {importSummary.childrenImported} child profile
             {importSummary.childrenImported === 1 ? "" : "s"}, {importSummary.choresImported} chore
             {importSummary.choresImported === 1 ? "" : "s"}, and{" "}
@@ -226,7 +232,7 @@ export default function Users() {
       </div>
 
       <div className="card">
-        <h2 className="mb-4 text-lg font-medium text-white">Add a profile</h2>
+        <h2 className="mb-4 text-lg font-medium text-slate-900 dark:text-white">Add a profile</h2>
         <form onSubmit={handleAdd} className="space-y-4">
           <div className="flex gap-3">
             <input
@@ -241,10 +247,10 @@ export default function Users() {
               value={role}
               onChange={(e) => setRole(e.target.value as "parent" | "child")}
             >
-              <option value="parent" className="bg-slate-900">
+              <option value="parent" className="dark:bg-slate-900">
                 Parent
               </option>
-              <option value="child" className="bg-slate-900">
+              <option value="child" className="dark:bg-slate-900">
                 Child
               </option>
             </select>
@@ -258,8 +264,8 @@ export default function Users() {
                 onClick={() => setAvatarEmoji(emoji)}
                 className={`flex h-9 w-9 items-center justify-center rounded-full text-lg ${
                   avatarEmoji === emoji
-                    ? "bg-amber-400/20 ring-2 ring-amber-400"
-                    : "bg-white/5 hover:bg-white/10"
+                    ? "bg-amber-400/20 ring-2 ring-amber-500 dark:ring-amber-400"
+                    : "bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10"
                 }`}
               >
                 {emoji}
@@ -277,7 +283,7 @@ export default function Users() {
             />
           )}
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <button type="submit" className="btn-primary">
             Add profile
           </button>

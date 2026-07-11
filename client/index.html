@@ -4,8 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Chorey</title>
+    <script>
+      // Applied before first paint so there's no flash of the wrong theme.
+      // Dark is the default — only an explicit saved "light" choice opts out.
+      if (localStorage.getItem("chorey-theme") !== "light") {
+        document.documentElement.classList.add("dark");
+      }
+    </script>
   </head>
-  <body class="bg-slate-950">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

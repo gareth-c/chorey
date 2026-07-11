@@ -127,10 +127,10 @@ export default function Dashboard() {
   }
 
   const header = (
-    <div className="mb-8 flex items-start justify-between border-b border-white/10 pb-6">
+    <div className="mb-8 flex items-start justify-between border-b border-slate-200 pb-6 dark:border-white/10">
       <div>
-        <h1 className="mb-1 text-2xl font-semibold text-white">Chorey</h1>
-        <p className="text-sm text-slate-400">Management interface</p>
+        <h1 className="mb-1 text-2xl font-semibold text-slate-900 dark:text-white">Chorey</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Management interface</p>
       </div>
       <Link to="/app/users" className="btn-secondary">
         Manage users
@@ -144,13 +144,13 @@ export default function Dashboard() {
         {header}
 
         <div className="mt-10 sm:mt-16">
-          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-amber-400">
+          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">
             Getting started
           </p>
-          <h2 className="max-w-xl text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl">
+          <h2 className="max-w-xl text-4xl font-bold leading-tight tracking-tight text-slate-900 dark:text-white sm:text-5xl">
             Nobody's on the board yet.
           </h2>
-          <p className="mt-4 max-w-lg text-base text-slate-300 sm:text-lg">
+          <p className="mt-4 max-w-lg text-base text-slate-600 dark:text-slate-300 sm:text-lg">
             Add your first Child profile and Chorey turns their chores into a star chart worth
             checking every day.
           </p>
@@ -169,7 +169,7 @@ export default function Dashboard() {
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="flex h-14 w-14 animate-pulse items-center justify-center rounded-full border-2 border-dashed border-white/20 text-xl text-white/20 sm:h-16 sm:w-16"
+                className="flex h-14 w-14 animate-pulse items-center justify-center rounded-full border-2 border-dashed border-slate-300 text-xl text-slate-300 dark:border-white/20 dark:text-white/20 sm:h-16 sm:w-16"
                 style={{ animationDelay: `${i * 0.3}s` }}
               >
                 🙂
@@ -185,7 +185,7 @@ export default function Dashboard() {
             ].map(([emoji, label]) => (
               <span
                 key={label}
-                className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-sm text-slate-200 backdrop-blur"
+                className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1.5 text-sm text-slate-600 dark:bg-white/10 dark:text-slate-200 dark:backdrop-blur"
               >
                 <span aria-hidden="true" className="animate-twinkle">
                   {emoji}
@@ -204,22 +204,24 @@ export default function Dashboard() {
       {header}
 
       <div className="card">
-        <h2 className="mb-4 text-lg font-medium text-white">Chores</h2>
+        <h2 className="mb-4 text-lg font-medium text-slate-900 dark:text-white">Chores</h2>
         <div className="mb-5 space-y-2">
           {chores.map((chore) => (
             <div
               key={chore.id}
-              className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
+              className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]"
             >
               <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-lg dark:bg-white/10">
                   {chore.assigneeAvatar}
                 </span>
                 <div>
-                  <p className="text-sm font-medium text-white">{chore.name}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {chore.name}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     {chore.assigneeName} · {FREQUENCY_LABELS[chore.frequency]} ·{" "}
-                    <span className="text-amber-300">{chore.stars} ⭐</span>
+                    <span className="text-amber-600 dark:text-amber-300">{chore.stars} ⭐</span>
                   </p>
                 </div>
               </div>
@@ -228,7 +230,9 @@ export default function Dashboard() {
               </button>
             </div>
           ))}
-          {chores.length === 0 && <p className="text-sm text-slate-400">No chores yet.</p>}
+          {chores.length === 0 && (
+            <p className="text-sm text-slate-500 dark:text-slate-400">No chores yet.</p>
+          )}
         </div>
 
         <form onSubmit={handleAddChore} className="space-y-3">
@@ -246,7 +250,7 @@ export default function Dashboard() {
               onChange={(e) => setAssignedTo(e.target.value)}
             >
               {children.map((c) => (
-                <option key={c.id} value={c.id} className="bg-slate-900">
+                <option key={c.id} value={c.id} className="dark:bg-slate-900">
                   {c.avatarEmoji} {c.name}
                 </option>
               ))}
@@ -257,7 +261,7 @@ export default function Dashboard() {
               onChange={(e) => setFrequency(e.target.value as Frequency)}
             >
               {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
-                <option key={value} value={value} className="bg-slate-900">
+                <option key={value} value={value} className="dark:bg-slate-900">
                   {label}
                 </option>
               ))}
@@ -271,7 +275,7 @@ export default function Dashboard() {
               onChange={(e) => setStars(e.target.value)}
             />
           </div>
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <button type="submit" className="btn-primary">
             Add chore
           </button>
@@ -279,20 +283,28 @@ export default function Dashboard() {
       </div>
 
       <div className="card">
-        <h2 className="mb-4 text-lg font-medium text-white">Reward rules</h2>
+        <h2 className="mb-4 text-lg font-medium text-slate-900 dark:text-white">Reward rules</h2>
         <div className="space-y-5">
           {rules.map((rule) => (
-            <div key={rule.userId} className="rounded-xl border border-white/10 p-4">
-              <p className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
+            <div
+              key={rule.userId}
+              className="rounded-xl border border-slate-200 p-4 dark:border-white/10"
+            >
+              <p className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-white">
                 <span>{rule.avatarEmoji}</span> {rule.name}
-                <span className="ml-auto text-xs font-normal text-slate-400">
-                  <span className="text-amber-300">{rule.progress.starsToday} ⭐</span> today ·{" "}
-                  <span className="text-amber-300">{rule.progress.starsThisWeek} ⭐</span> this
-                  week
+                <span className="ml-auto text-xs font-normal text-slate-500 dark:text-slate-400">
+                  <span className="text-amber-600 dark:text-amber-300">
+                    {rule.progress.starsToday} ⭐
+                  </span>{" "}
+                  today ·{" "}
+                  <span className="text-amber-600 dark:text-amber-300">
+                    {rule.progress.starsThisWeek} ⭐
+                  </span>{" "}
+                  this week
                 </span>
               </p>
               <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-sm text-slate-300">
+                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                   Daily star goal
                   <input
                     type="number"
@@ -331,7 +343,7 @@ export default function Dashboard() {
                 </button>
               </div>
               {expandedHistory[rule.userId] && (
-                <div className="mt-4 border-t border-white/10 pt-4">
+                <div className="mt-4 border-t border-slate-200 pt-4 dark:border-white/10">
                   <WeeklyHistory weeks={rule.progress.weeks} />
                 </div>
               )}
@@ -341,8 +353,10 @@ export default function Dashboard() {
       </div>
 
       <div className="card">
-        <h2 className="mb-1 text-lg font-medium text-white">Child Portal links</h2>
-        <p className="mb-4 text-sm text-slate-400">
+        <h2 className="mb-1 text-lg font-medium text-slate-900 dark:text-white">
+          Child Portal links
+        </h2>
+        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
           Share this link with a child's iPad or phone — no login needed, and it only shows their
           own chores. A "Parent sign-in" link on that same page lets you switch into this
           management interface from the shared device, gated by your password or passkey.
@@ -352,13 +366,15 @@ export default function Dashboard() {
           {links.map((link) => (
             <div
               key={link.userId}
-              className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
+              className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-lg dark:bg-white/10">
                 {link.avatarEmoji}
               </span>
-              <span className="text-sm font-medium text-white">{link.name}</span>
-              <span className="min-w-0 flex-1 truncate text-sm text-slate-400">
+              <span className="text-sm font-medium text-slate-900 dark:text-white">
+                {link.name}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm text-slate-500 dark:text-slate-400">
                 {link.url ?? "No link yet"}
               </span>
               {link.url && (
