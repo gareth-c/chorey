@@ -1,0 +1,14 @@
+services:
+  chorey:
+    build: .
+    ports:
+      - "5152:5152"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=${PORT:-5152}
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-in-production}
+      - RP_ID=${RP_ID:-localhost}
+      - RP_NAME=${RP_NAME:-Chorey}
+      - ORIGIN=${ORIGIN:-http://localhost:5152}
+    restart: unless-stopped

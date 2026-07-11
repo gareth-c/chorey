@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local data (the sqlite db and its WAL/journal files)
+data/*.db
+data/*.db-*
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# OS/editor cruft
+.DS_Store
