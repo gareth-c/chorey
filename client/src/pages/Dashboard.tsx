@@ -140,11 +140,76 @@ export default function Dashboard() {
 
   if (children.length === 0) {
     return (
-      <div className="max-w-2xl">
+      <div className="max-w-3xl">
         {header}
-        <p className="mt-4 text-sm text-slate-500">
-          Add a Child profile under Manage users before setting up chores.
-        </p>
+
+        <div className="relative mt-6 overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 px-8 py-14 shadow-2xl sm:px-14 sm:py-20">
+          {/* Ambient glow blobs — purely decorative background texture */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="absolute -left-20 -top-20 h-72 w-72 animate-blob rounded-full bg-brand-500/30 blur-3xl" />
+            <div
+              className="absolute -bottom-24 right-0 h-80 w-80 animate-blob rounded-full bg-amber-400/20 blur-3xl"
+              style={{ animationDelay: "4s" }}
+            />
+            <div
+              className="absolute right-1/3 top-0 h-56 w-56 animate-blob rounded-full bg-fuchsia-500/10 blur-3xl"
+              style={{ animationDelay: "8s" }}
+            />
+          </div>
+
+          <div className="relative">
+            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-amber-400">
+              Getting started
+            </p>
+            <h1 className="max-w-xl text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl">
+              Nobody's on the board yet.
+            </h1>
+            <p className="mt-4 max-w-lg text-base text-slate-300 sm:text-lg">
+              Add your first Child profile and Chorey turns their chores into a star chart worth
+              checking every day.
+            </p>
+
+            <Link
+              to="/app/users"
+              className="group mt-8 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-6 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-amber-500/30 transition-transform hover:scale-105 hover:shadow-amber-400/40"
+            >
+              <span className="text-lg transition-transform group-hover:rotate-90">＋</span>
+              Add your first child
+            </Link>
+
+            {/* Ghost profile row — an intentional nod to a "who's watching"
+                picker, foreshadowing where child avatars will appear. */}
+            <div className="mt-12 flex items-center gap-4">
+              {[0, 1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="flex h-14 w-14 animate-pulse items-center justify-center rounded-full border-2 border-dashed border-white/20 text-xl text-white/20 sm:h-16 sm:w-16"
+                  style={{ animationDelay: `${i * 0.3}s` }}
+                >
+                  🙂
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-10 flex flex-wrap gap-3">
+              {[
+                ["📋", "Assign chores"],
+                ["⭐", "Track stars"],
+                ["🎉", "Unlock rewards"],
+              ].map(([emoji, label]) => (
+                <span
+                  key={label}
+                  className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-sm text-slate-200 backdrop-blur"
+                >
+                  <span aria-hidden="true" className="animate-twinkle">
+                    {emoji}
+                  </span>
+                  {label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

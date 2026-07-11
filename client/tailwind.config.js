@@ -17,6 +17,21 @@ export default {
           900: "#212a69",
         },
       },
+      keyframes: {
+        blob: {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "33%": { transform: "translate(3%, -4%) scale(1.08)" },
+          "66%": { transform: "translate(-3%, 3%) scale(0.95)" },
+        },
+        twinkle: {
+          "0%, 100%": { opacity: 0.25, transform: "scale(0.9)" },
+          "50%": { opacity: 1, transform: "scale(1.1)" },
+        },
+      },
+      animation: {
+        blob: "blob 12s ease-in-out infinite",
+        twinkle: "twinkle 2.4s ease-in-out infinite",
+      },
     },
   },
   plugins: [],
