@@ -29,7 +29,7 @@ export default function SetupWizard({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center">
+    <div className="flex h-screen items-center justify-center px-6 py-10">
       <form onSubmit={handleSubmit} className="card w-full max-w-md">
         <h1 className="text-2xl font-semibold text-white">Welcome to Chorey</h1>
         <p className="mt-1 mb-6 text-sm text-slate-400">

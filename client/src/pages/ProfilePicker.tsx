@@ -104,7 +104,7 @@ export default function ProfilePicker({ onCancel }: { onCancel?: () => void }) {
   }
 
   return (
-    <div className="flex h-screen flex-col items-center justify-center gap-10">
+    <div className="flex h-screen flex-col items-center justify-center gap-10 px-6 py-10">
       <div className="text-center">
         <h1 className="text-3xl font-semibold text-white">Who's managing?</h1>
         <p className="mt-1 text-sm text-slate-400">Sign in to open the management interface.</p>

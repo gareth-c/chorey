@@ -116,8 +116,8 @@ export default function Users() {
   }
 
   return (
-    <div className="max-w-3xl">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-3xl px-6 py-10 sm:px-10 sm:py-14">
+      <div className="mb-8 flex items-start justify-between border-b border-white/10 pb-6">
         <div>
           <h1 className="mb-1 text-2xl font-semibold text-white">Users</h1>
           <p className="text-sm text-slate-400">
@@ -125,7 +125,7 @@ export default function Users() {
             no login — they're reached only through their own Child Portal link.
           </p>
         </div>
-        <Link to="/app" className="btn-secondary">
+        <Link to="/app" className="btn-secondary shrink-0">
           ← Back to chores
         </Link>
       </div>

@@ -127,7 +127,7 @@ export default function Dashboard() {
   }
 
   const header = (
-    <div className="mb-1 flex items-start justify-between">
+    <div className="mb-8 flex items-start justify-between border-b border-white/10 pb-6">
       <div>
         <h1 className="mb-1 text-2xl font-semibold text-white">Chorey</h1>
         <p className="text-sm text-slate-400">Management interface</p>
@@ -140,7 +140,7 @@ export default function Dashboard() {
 
   if (children.length === 0) {
     return (
-      <div className="max-w-3xl">
+      <div className="mx-auto max-w-3xl px-6 py-10 sm:px-10 sm:py-14">
         {header}
 
         <div className="mt-10 sm:mt-16">
@@ -200,7 +200,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-3xl space-y-8">
+    <div className="mx-auto max-w-3xl space-y-8 px-6 py-10 sm:px-10 sm:py-14">
       {header}
 
       <div className="card">
