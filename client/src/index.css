@@ -3,25 +3,29 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-50 text-slate-900;
+  @apply bg-slate-950 text-slate-100;
 }
 
 @layer components {
+  .card {
+    @apply rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 backdrop-blur-md;
+  }
   .input {
-    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900
-      placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2
-      focus:ring-brand-100 disabled:bg-slate-50 disabled:text-slate-500;
+    @apply w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white
+      placeholder:text-slate-500 focus:border-amber-400/60 focus:outline-none focus:ring-2
+      focus:ring-amber-400/20 disabled:bg-white/[0.02] disabled:text-slate-500;
   }
   .btn-primary {
-    @apply rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white
-      hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 px-4 py-2 text-sm font-semibold
+      text-slate-900 shadow-md shadow-amber-500/20 hover:from-amber-300 hover:to-amber-400
+      disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-secondary {
-    @apply rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium
-      text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium
+      text-slate-200 backdrop-blur hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-danger {
-    @apply rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium
-      text-red-600 hover:bg-red-50;
+    @apply rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium
+      text-red-300 hover:bg-red-500/20;
   }
 }

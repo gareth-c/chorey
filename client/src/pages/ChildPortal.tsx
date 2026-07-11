@@ -48,7 +48,7 @@ export default function ChildPortal() {
 
   if (showParentSignIn) {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-50">
+      <div className="fixed inset-0 z-50">
         <ProfilePicker onCancel={() => setShowParentSignIn(false)} />
       </div>
     );
@@ -56,22 +56,20 @@ export default function ChildPortal() {
 
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50 p-6 text-center">
-        <p className="text-slate-500">{error}</p>
+      <div className="flex h-screen items-center justify-center p-6 text-center">
+        <p className="text-slate-400">{error}</p>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400">
-        Loading…
-      </div>
+      <div className="flex h-screen items-center justify-center text-slate-400">Loading…</div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen p-6">
       <ChoreChecklist
         childName={data.child.name}
         avatarEmoji={data.child.avatarEmoji}
@@ -81,7 +79,7 @@ export default function ChildPortal() {
       />
       <button
         onClick={() => setShowParentSignIn(true)}
-        className="fixed bottom-4 right-4 rounded-full bg-white px-3 py-1.5 text-xs text-slate-400 shadow-sm hover:text-slate-600"
+        className="fixed bottom-4 right-4 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-slate-300 backdrop-blur hover:bg-white/20"
       >
         Parent sign-in
       </button>

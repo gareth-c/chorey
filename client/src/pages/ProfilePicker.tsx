@@ -104,10 +104,10 @@ export default function ProfilePicker({ onCancel }: { onCancel?: () => void }) {
   }
 
   return (
-    <div className="flex h-screen flex-col items-center justify-center gap-10 bg-slate-50">
+    <div className="flex h-screen flex-col items-center justify-center gap-10">
       <div className="text-center">
-        <h1 className="text-3xl font-semibold text-slate-900">Who's managing?</h1>
-        <p className="mt-1 text-sm text-slate-500">Sign in to open the management interface.</p>
+        <h1 className="text-3xl font-semibold text-white">Who's managing?</h1>
+        <p className="mt-1 text-sm text-slate-400">Sign in to open the management interface.</p>
       </div>
 
       <div className="flex flex-wrap justify-center gap-6">
@@ -122,8 +122,8 @@ export default function ProfilePicker({ onCancel }: { onCancel?: () => void }) {
       </div>
 
       {selected && (
-        <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="mb-4 text-sm font-medium text-slate-700">Sign in as {selected.name}</p>
+        <div className="card w-full max-w-sm">
+          <p className="mb-4 text-sm font-medium text-slate-200">Sign in as {selected.name}</p>
 
           {selected.hasPasskey && browserSupportsWebAuthn() && (
             <button
@@ -151,12 +151,12 @@ export default function ProfilePicker({ onCancel }: { onCancel?: () => void }) {
             </form>
           )}
 
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+          {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
         </div>
       )}
 
       {onCancel && (
-        <button onClick={onCancel} className="text-sm text-slate-400 hover:text-slate-600">
+        <button onClick={onCancel} className="text-sm text-slate-500 hover:text-slate-300">
           ← Back to chores
         </button>
       )}

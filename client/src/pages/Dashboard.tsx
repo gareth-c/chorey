@@ -129,8 +129,8 @@ export default function Dashboard() {
   const header = (
     <div className="mb-1 flex items-start justify-between">
       <div>
-        <h1 className="mb-1 text-2xl font-semibold text-slate-900">Chorey</h1>
-        <p className="text-sm text-slate-500">Management interface</p>
+        <h1 className="mb-1 text-2xl font-semibold text-white">Chorey</h1>
+        <p className="text-sm text-slate-400">Management interface</p>
       </div>
       <Link to="/app/users" className="btn-secondary">
         Manage users
@@ -143,71 +143,56 @@ export default function Dashboard() {
       <div className="max-w-3xl">
         {header}
 
-        <div className="relative mt-6 overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 px-8 py-14 shadow-2xl sm:px-14 sm:py-20">
-          {/* Ambient glow blobs — purely decorative background texture */}
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="absolute -left-20 -top-20 h-72 w-72 animate-blob rounded-full bg-brand-500/30 blur-3xl" />
-            <div
-              className="absolute -bottom-24 right-0 h-80 w-80 animate-blob rounded-full bg-amber-400/20 blur-3xl"
-              style={{ animationDelay: "4s" }}
-            />
-            <div
-              className="absolute right-1/3 top-0 h-56 w-56 animate-blob rounded-full bg-fuchsia-500/10 blur-3xl"
-              style={{ animationDelay: "8s" }}
-            />
+        <div className="mt-10 sm:mt-16">
+          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-amber-400">
+            Getting started
+          </p>
+          <h2 className="max-w-xl text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl">
+            Nobody's on the board yet.
+          </h2>
+          <p className="mt-4 max-w-lg text-base text-slate-300 sm:text-lg">
+            Add your first Child profile and Chorey turns their chores into a star chart worth
+            checking every day.
+          </p>
+
+          <Link
+            to="/app/users"
+            className="group mt-8 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-6 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-amber-500/30 transition-transform hover:scale-105 hover:shadow-amber-400/40"
+          >
+            <span className="text-lg transition-transform group-hover:rotate-90">＋</span>
+            Add your first child
+          </Link>
+
+          {/* Ghost profile row — an intentional nod to the "who's watching"
+              picker at /login, foreshadowing where child avatars will appear. */}
+          <div className="mt-12 flex items-center gap-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="flex h-14 w-14 animate-pulse items-center justify-center rounded-full border-2 border-dashed border-white/20 text-xl text-white/20 sm:h-16 sm:w-16"
+                style={{ animationDelay: `${i * 0.3}s` }}
+              >
+                🙂
+              </div>
+            ))}
           </div>
 
-          <div className="relative">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-amber-400">
-              Getting started
-            </p>
-            <h1 className="max-w-xl text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl">
-              Nobody's on the board yet.
-            </h1>
-            <p className="mt-4 max-w-lg text-base text-slate-300 sm:text-lg">
-              Add your first Child profile and Chorey turns their chores into a star chart worth
-              checking every day.
-            </p>
-
-            <Link
-              to="/app/users"
-              className="group mt-8 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-6 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-amber-500/30 transition-transform hover:scale-105 hover:shadow-amber-400/40"
-            >
-              <span className="text-lg transition-transform group-hover:rotate-90">＋</span>
-              Add your first child
-            </Link>
-
-            {/* Ghost profile row — an intentional nod to a "who's watching"
-                picker, foreshadowing where child avatars will appear. */}
-            <div className="mt-12 flex items-center gap-4">
-              {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="flex h-14 w-14 animate-pulse items-center justify-center rounded-full border-2 border-dashed border-white/20 text-xl text-white/20 sm:h-16 sm:w-16"
-                  style={{ animationDelay: `${i * 0.3}s` }}
-                >
-                  🙂
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-10 flex flex-wrap gap-3">
-              {[
-                ["📋", "Assign chores"],
-                ["⭐", "Track stars"],
-                ["🎉", "Unlock rewards"],
-              ].map(([emoji, label]) => (
-                <span
-                  key={label}
-                  className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-sm text-slate-200 backdrop-blur"
-                >
-                  <span aria-hidden="true" className="animate-twinkle">
-                    {emoji}
-                  </span>
-                  {label}
+          <div className="mt-10 flex flex-wrap gap-3">
+            {[
+              ["📋", "Assign chores"],
+              ["⭐", "Track stars"],
+              ["🎉", "Unlock rewards"],
+            ].map(([emoji, label]) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-sm text-slate-200 backdrop-blur"
+              >
+                <span aria-hidden="true" className="animate-twinkle">
+                  {emoji}
                 </span>
-              ))}
-            </div>
+                {label}
+              </span>
+            ))}
           </div>
         </div>
       </div>
@@ -218,20 +203,23 @@ export default function Dashboard() {
     <div className="max-w-3xl space-y-8">
       {header}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-medium text-slate-900">Chores</h2>
+      <div className="card">
+        <h2 className="mb-4 text-lg font-medium text-white">Chores</h2>
         <div className="mb-5 space-y-2">
           {chores.map((chore) => (
             <div
               key={chore.id}
-              className="flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3"
+              className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
             >
               <div className="flex items-center gap-3">
-                <span>{chore.assigneeAvatar}</span>
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg">
+                  {chore.assigneeAvatar}
+                </span>
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{chore.name}</p>
+                  <p className="text-sm font-medium text-white">{chore.name}</p>
                   <p className="text-xs text-slate-400">
-                    {chore.assigneeName} · {FREQUENCY_LABELS[chore.frequency]} · {chore.stars} ⭐
+                    {chore.assigneeName} · {FREQUENCY_LABELS[chore.frequency]} ·{" "}
+                    <span className="text-amber-300">{chore.stars} ⭐</span>
                   </p>
                 </div>
               </div>
@@ -258,7 +246,7 @@ export default function Dashboard() {
               onChange={(e) => setAssignedTo(e.target.value)}
             >
               {children.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option key={c.id} value={c.id} className="bg-slate-900">
                   {c.avatarEmoji} {c.name}
                 </option>
               ))}
@@ -269,7 +257,7 @@ export default function Dashboard() {
               onChange={(e) => setFrequency(e.target.value as Frequency)}
             >
               {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
+                <option key={value} value={value} className="bg-slate-900">
                   {label}
                 </option>
               ))}
@@ -283,26 +271,28 @@ export default function Dashboard() {
               onChange={(e) => setStars(e.target.value)}
             />
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-400">{error}</p>}
           <button type="submit" className="btn-primary">
             Add chore
           </button>
         </form>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-medium text-slate-900">Reward rules</h2>
+      <div className="card">
+        <h2 className="mb-4 text-lg font-medium text-white">Reward rules</h2>
         <div className="space-y-5">
           {rules.map((rule) => (
-            <div key={rule.userId} className="rounded-xl border border-slate-100 p-4">
-              <p className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-900">
+            <div key={rule.userId} className="rounded-xl border border-white/10 p-4">
+              <p className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
                 <span>{rule.avatarEmoji}</span> {rule.name}
                 <span className="ml-auto text-xs font-normal text-slate-400">
-                  {rule.progress.starsToday} ⭐ today · {rule.progress.starsThisWeek} ⭐ this week
+                  <span className="text-amber-300">{rule.progress.starsToday} ⭐</span> today ·{" "}
+                  <span className="text-amber-300">{rule.progress.starsThisWeek} ⭐</span> this
+                  week
                 </span>
               </p>
               <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-sm text-slate-600">
+                <label className="flex items-center gap-2 text-sm text-slate-300">
                   Daily star goal
                   <input
                     type="number"
@@ -341,7 +331,7 @@ export default function Dashboard() {
                 </button>
               </div>
               {expandedHistory[rule.userId] && (
-                <div className="mt-4 border-t border-slate-100 pt-4">
+                <div className="mt-4 border-t border-white/10 pt-4">
                   <WeeklyHistory weeks={rule.progress.weeks} />
                 </div>
               )}
@@ -350,9 +340,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-1 text-lg font-medium text-slate-900">Child Portal links</h2>
-        <p className="mb-4 text-sm text-slate-500">
+      <div className="card">
+        <h2 className="mb-1 text-lg font-medium text-white">Child Portal links</h2>
+        <p className="mb-4 text-sm text-slate-400">
           Share this link with a child's iPad or phone — no login needed, and it only shows their
           own chores. A "Parent sign-in" link on that same page lets you switch into this
           management interface from the shared device, gated by your password or passkey.
@@ -362,10 +352,12 @@ export default function Dashboard() {
           {links.map((link) => (
             <div
               key={link.userId}
-              className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 px-4 py-3"
+              className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
             >
-              <span>{link.avatarEmoji}</span>
-              <span className="text-sm font-medium text-slate-900">{link.name}</span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg">
+                {link.avatarEmoji}
+              </span>
+              <span className="text-sm font-medium text-white">{link.name}</span>
               <span className="min-w-0 flex-1 truncate text-sm text-slate-400">
                 {link.url ?? "No link yet"}
               </span>

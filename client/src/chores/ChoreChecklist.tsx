@@ -49,27 +49,27 @@ export default function ChoreChecklist({
   return (
     <div className="mx-auto max-w-xl">
       <div className="mb-6 flex items-center gap-3">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 text-3xl">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-3xl">
           {avatarEmoji}
         </span>
         <div>
-          <p className="text-xl font-semibold text-slate-900">{childName}'s chores</p>
-          <p className="text-sm text-slate-500">Tap a chore when it's done</p>
+          <p className="text-xl font-semibold text-white">{childName}'s chores</p>
+          <p className="text-sm text-slate-400">Tap a chore when it's done</p>
         </div>
       </div>
 
-      <div className="mb-6 space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="card mb-6 space-y-4">
         <div>
           <div className="mb-1 flex items-center justify-between text-sm">
-            <span className="font-medium text-slate-700">Today</span>
-            <span className="text-slate-500">
+            <span className="font-medium text-slate-200">Today</span>
+            <span className="text-amber-300">
               {progress.starsToday} {progress.dailyGoal > 0 && `/ ${progress.dailyGoal}`} ⭐
             </span>
           </div>
           {progress.dailyGoal > 0 && (
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
               <div
-                className="h-full rounded-full bg-brand-500 transition-all"
+                className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all"
                 style={{ width: `${todayPct}%` }}
               />
             </div>
@@ -78,16 +78,16 @@ export default function ChoreChecklist({
 
         <div>
           <div className="mb-1 flex items-center justify-between text-sm">
-            <span className="font-medium text-slate-700">This week</span>
-            <span className="text-slate-500">
+            <span className="font-medium text-slate-200">This week</span>
+            <span className="text-amber-300">
               {progress.starsThisWeek}{" "}
               {progress.weeklyThreshold > 0 && `/ ${progress.weeklyThreshold}`} ⭐
             </span>
           </div>
           {progress.weeklyThreshold > 0 && (
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
               <div
-                className="h-full rounded-full bg-brand-500 transition-all"
+                className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all"
                 style={{ width: `${weekPct}%` }}
               />
             </div>
@@ -98,8 +98,8 @@ export default function ChoreChecklist({
           <div
             className={`rounded-xl px-4 py-3 text-sm font-medium ${
               progress.rewardEarned
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-slate-50 text-slate-500"
+                ? "border border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
+                : "border border-white/10 bg-white/5 text-slate-400"
             }`}
           >
             {progress.rewardEarned ? "🎉 Reward earned: " : "Reward this week: "}
@@ -127,8 +127,8 @@ export default function ChoreChecklist({
                   onClick={() => onToggle(chore.id)}
                   className={`flex w-full items-center justify-between rounded-2xl border-2 px-5 py-4 text-left transition-colors ${
                     chore.doneThisPeriod
-                      ? "border-emerald-200 bg-emerald-50"
-                      : "border-slate-200 bg-white hover:border-brand-300"
+                      ? "border-emerald-400/30 bg-emerald-500/10"
+                      : "border-white/10 bg-white/5 hover:border-amber-400/40 hover:bg-white/10"
                   }`}
                 >
                   <span className="flex items-center gap-3">
@@ -136,14 +136,14 @@ export default function ChoreChecklist({
                       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-lg ${
                         chore.doneThisPeriod
                           ? "border-emerald-400 bg-emerald-400 text-white"
-                          : "border-slate-300 text-transparent"
+                          : "border-white/20 text-transparent"
                       }`}
                     >
                       ✓
                     </span>
-                    <span className="text-lg font-medium text-slate-900">{chore.name}</span>
+                    <span className="text-lg font-medium text-white">{chore.name}</span>
                   </span>
-                  <span className="shrink-0 text-sm font-semibold text-brand-600">
+                  <span className="shrink-0 text-sm font-semibold text-amber-300">
                     {chore.stars} ⭐
                   </span>
                 </button>

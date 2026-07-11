@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import Users from "./pages/Users";
 import ChildPortal from "./pages/ChildPortal";
 import VersionBadge from "./components/VersionBadge";
+import AppBackground from "./components/AppBackground";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -14,12 +15,16 @@ export default function App() {
   // don't block it on the (unrelated) session check.
   if (loading && !location.pathname.startsWith("/portal/")) {
     return (
-      <div className="flex h-screen items-center justify-center text-slate-400">Loading…</div>
+      <>
+        <AppBackground />
+        <div className="flex h-screen items-center justify-center text-slate-400">Loading…</div>
+      </>
     );
   }
 
   return (
     <>
+      <AppBackground />
       <Routes>
         <Route path="/portal/:token" element={<ChildPortal />} />
         <Route path="/login" element={user ? <Navigate to="/app" replace /> : <ProfilePicker />} />
