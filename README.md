@@ -20,8 +20,15 @@ two distinct surfaces:
 
 Each chore is **daily**, **weekly**, or **monthly** — it can only be completed
 again once the current period rolls over. Both surfaces show a Monday–Sunday
-day strip for the current week and a summary of the last 4 completed weeks
-(total stars and whether the reward threshold was hit).
+day strip for the current week and a summary of past completed weeks (total
+stars and whether the reward threshold was hit) — 4 weeks by default, and how
+many is a household setting.
+
+Day/week boundaries respect a configurable household timezone (defaults to
+UTC), and a completed week's reward threshold is frozen to whatever the goal
+was at the time — changing a child's daily goal only affects the current week
+and weeks going forward, never rewrites history. Both are set from **Manage
+users → Household settings**.
 
 The whole app has both a light and a dark theme, switchable from a toggle in
 the top-right corner — dark is the default.

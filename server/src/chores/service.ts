@@ -1,5 +1,7 @@
 import { nanoid } from "nanoid";
 import { db } from "../db/client";
+import { getSettings } from "../settings/service";
+import { zonedDateKey, zonedDayStart, zonedMonthKey, zonedWeekStart, toSqliteDatetime } from "./timezone";
 
 export type Frequency = "daily" | "weekly" | "monthly";
 
@@ -13,40 +15,14 @@ interface ChoreRow {
   updated_at: string;
 }
 
-function pad2(n: number): string {
-  return n.toString().padStart(2, "0");
+function householdTimezone(): string {
+  return getSettings().timezone;
 }
 
-function toDateKey(d: Date): string {
-  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
-}
-
-function toMonthKey(d: Date): string {
-  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
-}
-
-function startOfUTCDate(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
-
-function getWeekStart(d: Date): Date {
-  const day = d.getUTCDay(); // 0=Sun..6=Sat
-  const diffToMonday = (day + 6) % 7;
-  const start = startOfUTCDate(d);
-  start.setUTCDate(start.getUTCDate() - diffToMonday);
-  return start;
-}
-
-function formatSqliteDatetime(d: Date): string {
-  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())} ${pad2(
-    d.getUTCHours()
-  )}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`;
-}
-
-export function computePeriodKey(frequency: Frequency, now: Date): string {
-  if (frequency === "daily") return toDateKey(now);
-  if (frequency === "weekly") return toDateKey(getWeekStart(now));
-  return toMonthKey(now);
+export function computePeriodKey(frequency: Frequency, now: Date, timeZone: string): string {
+  if (frequency === "daily") return zonedDateKey(now, timeZone);
+  if (frequency === "weekly") return zonedDateKey(zonedWeekStart(now, timeZone), timeZone);
+  return zonedMonthKey(now, timeZone);
 }
 
 function sumStars(userId: string, start: string, end: string): number {
@@ -59,6 +35,20 @@ function sumStars(userId: string, start: string, end: string): number {
     )
     .get(userId, start, end) as { total: number };
   return row.total;
+}
+
+/** The daily_star_goal in effect as of `asOfDateKey` ('YYYY-MM-DD'), per reward_rule_history. */
+function getEffectiveDailyGoal(userId: string, asOfDateKey: string): number {
+  const row = db
+    .prepare(
+      `SELECT daily_star_goal FROM reward_rule_history
+       WHERE user_id = ? AND effective_from <= ?
+       ORDER BY effective_from DESC, created_at DESC LIMIT 1`
+    )
+    .get(userId, asOfDateKey) as { daily_star_goal: number } | undefined;
+  // No history row covers this date (e.g. reward rule never set) — fall back
+  // to the live current value, same as the app's behavior before history was tracked.
+  return row ? row.daily_star_goal : getRewardRule(userId).dailyStarGoal;
 }
 
 export interface DayStars {
@@ -78,48 +68,48 @@ export interface WeekSummary {
   days: DayStars[];
 }
 
-/** How many completed weeks (before the current, in-progress one) to include in the history. */
-const PAST_WEEKS_SHOWN = 4;
-
-/** Current week (Mon-Sun) plus the last PAST_WEEKS_SHOWN completed weeks, newest first. */
-function computeWeeklyHistory(userId: string, weeklyThreshold: number): WeekSummary[] {
+/** Current week (Mon-Sun) plus the last `historyWeeksShown` completed weeks, newest first. */
+function computeWeeklyHistory(userId: string, timeZone: string, historyWeeksShown: number): WeekSummary[] {
   const now = new Date();
-  const today = startOfUTCDate(now);
-  const currentWeekStart = getWeekStart(now);
+  const today = zonedDayStart(now, timeZone);
+  const currentWeekStart = zonedWeekStart(now, timeZone);
 
   const weeks: WeekSummary[] = [];
-  for (let i = 0; i <= PAST_WEEKS_SHOWN; i++) {
+  for (let i = 0; i <= historyWeeksShown; i++) {
     const weekStartDate = new Date(currentWeekStart.getTime() - i * 7 * 86400000);
-    const weekEndDate = new Date(weekStartDate.getTime() + 6 * 86400000);
+    const weekStartKey = zonedDateKey(weekStartDate, timeZone);
+    // The current, still-open week always reflects the live goal — a parent
+    // adjusting it today shouldn't feel ignored until next Monday. Only
+    // completed weeks are frozen to the goal that was in effect when they started.
+    const weeklyThreshold =
+      i === 0 ? getRewardRule(userId).dailyStarGoal * 7 : getEffectiveDailyGoal(userId, weekStartKey) * 7;
 
     const days: DayStars[] = [];
     for (let d = 0; d < 7; d++) {
-      const dayDate = new Date(weekStartDate.getTime() + d * 86400000);
+      const dayDate = zonedDayStart(new Date(weekStartDate.getTime() + d * 86400000), timeZone);
       const isFuture = dayDate > today;
       const stars = isFuture
         ? 0
         : sumStars(
             userId,
-            formatSqliteDatetime(dayDate),
-            formatSqliteDatetime(new Date(dayDate.getTime() + 86400000))
+            toSqliteDatetime(dayDate),
+            toSqliteDatetime(zonedDayStart(new Date(dayDate.getTime() + 86400000), timeZone))
           );
       days.push({
-        date: toDateKey(dayDate),
+        date: zonedDateKey(dayDate, timeZone),
         stars,
-        isToday: toDateKey(dayDate) === toDateKey(today),
+        isToday: zonedDateKey(dayDate, timeZone) === zonedDateKey(today, timeZone),
         isFuture,
       });
     }
 
-    const weekStars = sumStars(
-      userId,
-      formatSqliteDatetime(weekStartDate),
-      formatSqliteDatetime(new Date(weekStartDate.getTime() + 7 * 86400000))
-    );
+    const weekEndDate = zonedDayStart(new Date(weekStartDate.getTime() + 6 * 86400000), timeZone);
+    const nextWeekStart = zonedDayStart(new Date(weekStartDate.getTime() + 7 * 86400000), timeZone);
+    const weekStars = sumStars(userId, toSqliteDatetime(weekStartDate), toSqliteDatetime(nextWeekStart));
 
     weeks.push({
-      weekStart: toDateKey(weekStartDate),
-      weekEnd: toDateKey(weekEndDate),
+      weekStart: weekStartKey,
+      weekEnd: zonedDateKey(weekEndDate, timeZone),
       stars: weekStars,
       threshold: weeklyThreshold,
       rewardEarned: weeklyThreshold > 0 && weekStars >= weeklyThreshold,
@@ -141,18 +131,21 @@ export interface Progress {
 }
 
 export function computeProgress(userId: string): Progress {
+  const { timezone, historyWeeksShown } = getSettings();
   const now = new Date();
-  const todayStart = formatSqliteDatetime(startOfUTCDate(now));
-  const todayEnd = formatSqliteDatetime(new Date(startOfUTCDate(now).getTime() + 86400000));
-  const weekStartDate = getWeekStart(now);
-  const weekStart = formatSqliteDatetime(weekStartDate);
-  const weekEnd = formatSqliteDatetime(new Date(weekStartDate.getTime() + 7 * 86400000));
+  const todayStart = zonedDayStart(now, timezone);
+  const todayEnd = zonedDayStart(new Date(todayStart.getTime() + 86400000), timezone);
+  const weekStartDate = zonedWeekStart(now, timezone);
+  const weekEndDate = zonedDayStart(new Date(weekStartDate.getTime() + 7 * 86400000), timezone);
 
-  const starsToday = sumStars(userId, todayStart, todayEnd);
-  const starsThisWeek = sumStars(userId, weekStart, weekEnd);
+  const starsToday = sumStars(userId, toSqliteDatetime(todayStart), toSqliteDatetime(todayEnd));
+  const starsThisWeek = sumStars(userId, toSqliteDatetime(weekStartDate), toSqliteDatetime(weekEndDate));
 
   const rule = getRewardRule(userId);
-  const weeklyThreshold = rule.dailyStarGoal * 7;
+  const weeks = computeWeeklyHistory(userId, timezone, historyWeeksShown);
+  // Derived from weeks[0] rather than recomputed, so "This week"'s progress bar
+  // always agrees with the current week's entry in the history list below it.
+  const weeklyThreshold = weeks[0].threshold;
 
   return {
     starsToday,
@@ -160,8 +153,8 @@ export function computeProgress(userId: string): Progress {
     starsThisWeek,
     weeklyThreshold,
     weeklyReward: rule.weeklyReward,
-    rewardEarned: rule.dailyStarGoal > 0 && starsThisWeek >= weeklyThreshold,
-    weeks: computeWeeklyHistory(userId, weeklyThreshold),
+    rewardEarned: weeklyThreshold > 0 && starsThisWeek >= weeklyThreshold,
+    weeks,
   };
 }
 
@@ -176,8 +169,8 @@ export interface ChoreWithStatus {
   doneThisPeriod: boolean;
 }
 
-function isDoneThisPeriod(chore: ChoreRow, now: Date): boolean {
-  const periodKey = computePeriodKey(chore.frequency, now);
+function isDoneThisPeriod(chore: ChoreRow, now: Date, timeZone: string): boolean {
+  const periodKey = computePeriodKey(chore.frequency, now, timeZone);
   return !!db
     .prepare("SELECT 1 FROM chore_completions WHERE chore_id = ? AND period_key = ?")
     .get(chore.id, periodKey);
@@ -188,13 +181,14 @@ export function listChoresForUser(userId: string): ChoreWithStatus[] {
     .prepare("SELECT * FROM chores WHERE assigned_to = ? ORDER BY created_at ASC")
     .all(userId) as ChoreRow[];
   const now = new Date();
+  const timeZone = householdTimezone();
   return rows.map((c) => ({
     id: c.id,
     name: c.name,
     assignedTo: c.assigned_to,
     frequency: c.frequency,
     stars: c.stars,
-    doneThisPeriod: isDoneThisPeriod(c, now),
+    doneThisPeriod: isDoneThisPeriod(c, now, timeZone),
   }));
 }
 
@@ -208,6 +202,7 @@ export function listAllChoresWithStatus(): ChoreWithStatus[] {
     )
     .all() as (ChoreRow & { assignee_name: string; assignee_avatar: string })[];
   const now = new Date();
+  const timeZone = householdTimezone();
   return rows.map((c) => ({
     id: c.id,
     name: c.name,
@@ -216,7 +211,7 @@ export function listAllChoresWithStatus(): ChoreWithStatus[] {
     assigneeAvatar: c.assignee_avatar,
     frequency: c.frequency,
     stars: c.stars,
-    doneThisPeriod: isDoneThisPeriod(c, now),
+    doneThisPeriod: isDoneThisPeriod(c, now, timeZone),
   }));
 }
 
@@ -229,7 +224,7 @@ export function toggleCompletion(choreId: string): { completed: boolean } {
   if (!chore) throw new Error("Chore not found");
 
   const now = new Date();
-  const periodKey = computePeriodKey(chore.frequency, now);
+  const periodKey = computePeriodKey(chore.frequency, now, householdTimezone());
   const existing = db
     .prepare("SELECT id FROM chore_completions WHERE chore_id = ? AND period_key = ?")
     .get(choreId, periodKey) as { id: string } | undefined;
@@ -253,6 +248,11 @@ export function getRewardRule(userId: string): { dailyStarGoal: number; weeklyRe
 }
 
 export function setRewardRule(userId: string, dailyStarGoal: number, weeklyReward: string) {
+  const existing = getRewardRule(userId);
+  const hasHistory = !!db
+    .prepare("SELECT 1 FROM reward_rule_history WHERE user_id = ? LIMIT 1")
+    .get(userId);
+
   db.prepare(
     `INSERT INTO reward_rules (user_id, daily_star_goal, weekly_reward) VALUES (?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET
@@ -260,6 +260,15 @@ export function setRewardRule(userId: string, dailyStarGoal: number, weeklyRewar
        weekly_reward = excluded.weekly_reward,
        updated_at = datetime('now')`
   ).run(userId, dailyStarGoal, weeklyReward);
+
+  // Only record a new history point when the goal actually changes (or this
+  // is the first time it's set) — editing just the reward text shouldn't
+  // create a new snapshot.
+  if (!hasHistory || existing.dailyStarGoal !== dailyStarGoal) {
+    db.prepare(
+      "INSERT INTO reward_rule_history (id, user_id, daily_star_goal, effective_from) VALUES (?, ?, ?, ?)"
+    ).run(nanoid(), userId, dailyStarGoal, zonedDateKey(new Date(), householdTimezone()));
+  }
 }
 
 export function getLinkToken(userId: string): string | null {

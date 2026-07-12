@@ -5,6 +5,7 @@ import { authRouter } from "./routes/auth.routes";
 import { usersRouter } from "./routes/users.routes";
 import { portalRouter } from "./routes/portal.routes";
 import { importRouter } from "./routes/import.routes";
+import { settingsRouter } from "./routes/settings.routes";
 import { requireAuth } from "./middleware/requireAuth";
 import { registerRoutes as registerChoreRoutes } from "./chores/routes";
 import { version } from "./version";
@@ -23,6 +24,7 @@ export function createApp() {
   app.use("/api/auth", authRouter);
   app.use("/api/users", usersRouter);
   app.use("/api/import", importRouter);
+  app.use("/api/settings", settingsRouter);
 
   const choresRouter = Router();
   choresRouter.use(requireAuth);

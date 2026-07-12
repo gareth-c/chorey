@@ -14,6 +14,12 @@ interface ImportSummary {
   choresSkipped: number;
 }
 
+interface AppSettings {
+  timezone: string;
+  historyWeeksShown: number;
+  availableTimezones: string[];
+}
+
 export default function Users() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<Profile[]>([]);
@@ -26,15 +32,49 @@ export default function Users() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [timezoneDraft, setTimezoneDraft] = useState("");
+  const [historyWeeksDraft, setHistoryWeeksDraft] = useState("");
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
 
   async function load() {
     const { users } = await api.get<{ users: Profile[] }>("/users");
     setUsers(users);
   }
 
+  async function loadSettings() {
+    const data = await api.get<AppSettings>("/settings");
+    setSettings(data);
+    setTimezoneDraft(data.timezone);
+    setHistoryWeeksDraft(String(data.historyWeeksShown));
+  }
+
   useEffect(() => {
     void load();
+    void loadSettings();
   }, []);
+
+  async function handleSaveSettings(e: React.FormEvent) {
+    e.preventDefault();
+    setSettingsError(null);
+    setSettingsSaved(false);
+    setSettingsSaving(true);
+    try {
+      await api.put("/settings", {
+        timezone: timezoneDraft,
+        historyWeeksShown: parseInt(historyWeeksDraft, 10) || 1,
+      });
+      await loadSettings();
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 1500);
+    } catch (err) {
+      setSettingsError(getErrorMessage(err));
+    } finally {
+      setSettingsSaving(false);
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -228,6 +268,53 @@ export default function Users() {
               : ""}
             .
           </p>
+        )}
+      </div>
+
+      <div className="card mb-8">
+        <h2 className="mb-1 text-lg font-medium text-slate-900 dark:text-white">
+          Household settings
+        </h2>
+        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+          The timezone controls when a day/week starts and ends for every chore and the star chart.
+          The history length controls how many past weeks show up below the current one.
+        </p>
+        {settings && (
+          <form onSubmit={handleSaveSettings} className="flex flex-wrap items-end gap-3">
+            <label className="block">
+              <span className="mb-1 block text-sm text-slate-600 dark:text-slate-300">Timezone</span>
+              <select
+                className="input"
+                value={timezoneDraft}
+                onChange={(e) => setTimezoneDraft(e.target.value)}
+              >
+                {settings.availableTimezones.map((tz) => (
+                  <option key={tz} value={tz} className="dark:bg-slate-900">
+                    {tz}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm text-slate-600 dark:text-slate-300">
+                Past weeks shown
+              </span>
+              <input
+                type="number"
+                min="1"
+                max="52"
+                className="input w-28"
+                value={historyWeeksDraft}
+                onChange={(e) => setHistoryWeeksDraft(e.target.value)}
+              />
+            </label>
+            <button type="submit" disabled={settingsSaving} className="btn-secondary">
+              {settingsSaving ? "Saving…" : settingsSaved ? "Saved!" : "Save"}
+            </button>
+          </form>
+        )}
+        {settingsError && (
+          <p className="mt-3 text-sm text-red-600 dark:text-red-400">{settingsError}</p>
         )}
       </div>
 

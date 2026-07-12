@@ -56,15 +56,24 @@ port; in dev, Vite proxies `/api` to the server (`client/vite.config.ts`).
   idempotent per day/week/month. They do **not** drive historical reporting;
   `sumStars()` sums by `completed_at` timestamp range instead. Don't conflate
   the two when changing either.
-- **Weeks start Monday, end Sunday, all in UTC** — no per-user timezone
-  support. Deliberate simplification, not an oversight.
-- **`weekly_threshold` is not stored per week** — every `WeekSummary`,
-  including past ones, uses *today's* `reward_rules.daily_star_goal * 7`.
-  Changing a child's daily goal retroactively changes what past weeks show as
-  "earned." Fixing this would mean storing a threshold snapshot per week — a
-  real schema change, not a bug fix.
-- `PAST_WEEKS_SHOWN = 4` in `chores/service.ts` is the only thing controlling
-  how many past weeks render; trivial to change, currently not configurable.
+- **Weeks start Monday, end Sunday**, computed in the household's configured
+  timezone (`app_settings.timezone`, IANA name, default `UTC`) via
+  `chores/timezone.ts` — a small `Intl.DateTimeFormat`-based module, not a
+  date library. Every "day start" / "week start" is independently re-derived
+  from the target calendar date rather than by subtracting fixed millisecond
+  offsets, so a DST transition inside a week doesn't skew results by an hour.
+  Don't reintroduce raw `Date.UTC`/`getUTCDay()` math into `service.ts` — it
+  bypasses the household timezone entirely.
+- **`WeekSummary.threshold`**: the **current, still-open week** always uses
+  the *live* `reward_rules.daily_star_goal` (so a goal change today applies
+  immediately, not next Monday). **Completed weeks** are frozen to whatever
+  `reward_rule_history` says was in effect on that week's Monday
+  (`getEffectiveDailyGoal()`). Don't collapse this back to "always live" —
+  that's the exact bug it was built to fix. `setRewardRule()` only inserts a
+  new history row when the goal actually changes (or on the first goal for a
+  child), not on every reward-text edit.
+- How many past weeks render is `app_settings.history_weeks_shown`
+  (default 4), not a hardcoded constant — configurable via `/api/settings`.
 - `POST /api/import` (a `chore-export.json` from a previous version) always
   creates fresh children/chores rather than merging by name — importing the
   same file twice produces duplicates, intentionally.

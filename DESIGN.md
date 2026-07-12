@@ -119,19 +119,50 @@ CREATE TABLE IF NOT EXISTS portal_links (
   token TEXT NOT NULL UNIQUE,            -- the Child Portal URL's bearer credential
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Household-level settings. Singleton row (id is always 1) — one household per install.
+CREATE TABLE IF NOT EXISTS app_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  timezone TEXT NOT NULL DEFAULT 'UTC',           -- IANA name, e.g. 'America/New_York'
+  history_weeks_shown INTEGER NOT NULL DEFAULT 4  -- past (completed) weeks to include, beyond the current one
+);
+
+-- One row per change to a child's daily_star_goal, so a past week's reward
+-- threshold can reflect what the goal was *when that week happened* instead
+-- of always applying today's goal retroactively (see the nuance below).
+CREATE TABLE IF NOT EXISTS reward_rule_history (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  daily_star_goal INTEGER NOT NULL,
+  effective_from TEXT NOT NULL,          -- 'YYYY-MM-DD', the date this goal took effect
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 ```
 
 Split across `server/src/db/migrations/0001_init.sql` (users + sessions),
-`0002_chore_tracker.sql` (chores/completions/reward rules/portal links), and
-`0003_webauthn.sql` (the two passkey tables above), applied by a tiny
+`0002_chore_tracker.sql` (chores/completions/reward rules/portal links),
+`0003_webauthn.sql` (the two passkey tables above), `0004_settings.sql`
+(`app_settings`), and `0005_reward_rule_history.sql` (`reward_rule_history`,
+backfilled for existing rows — see the nuance below), applied by a tiny
 numbered-migration runner (`db/migrate.ts`).
 
-**Important nuance**: `weekly_threshold` isn't stored per week — it's always
-`reward_rules.daily_star_goal × 7`, the *current* rule. Historical week
-summaries (§4.2) apply today's threshold retroactively rather than whatever
-the goal was at the time. This is a deliberate simplification, not an
-oversight — fixing it would mean storing a threshold snapshot per week, which
-is a real (if small) schema change.
+**Important nuance**: `WeekSummary.threshold` (§4.2) is **not** simply "today's
+goal" anymore, but it isn't a full historical snapshot either — the split is
+deliberate:
+- The **current, still-open week** always uses the *live* `reward_rules.daily_star_goal`
+  — a parent raising or lowering the goal today immediately changes what this
+  week needs, rather than waiting until next Monday to take effect.
+- **Completed (past) weeks** are frozen to whatever `reward_rule_history`
+  records as in effect on that week's Monday, looked up via
+  `getEffectiveDailyGoal()` in `chores/service.ts`. Changing the goal today
+  never rewrites what a past week already showed.
+- Rows in `reward_rule_history` are written by `setRewardRule()` only when
+  the goal actually changes (not on every reward-text edit) or on the very
+  first goal for a child. The `0005` migration backfills one row per
+  existing `reward_rules` entry at `effective_from = '2000-01-01'`, since
+  there's no record of what a goal was before this table existed — this
+  preserves today's behavior for all pre-existing weeks; only goal changes
+  from that migration forward are genuinely snapshotted.
 
 ## 4. Backend architecture
 
@@ -146,6 +177,8 @@ server/src/
       0001_init.sql
       0002_chore_tracker.sql
       0003_webauthn.sql
+      0004_settings.sql
+      0005_reward_rule_history.sql
   auth/
     password.ts               # bcrypt hash/verify
     session.ts                 # cookie-based session create/destroy/lookup
@@ -161,9 +194,13 @@ server/src/
     users.routes.ts               # parent-only: create/edit/delete users, set/clear password, register/remove passkeys
     portal.routes.ts               # PUBLIC, no requireAuth — token-authenticated Child Portal
     import.routes.ts                # parent-only: import a chore-export.json from a previous version
+    settings.routes.ts              # parent-only: GET/PUT household timezone + history-weeks-shown
+  settings/
+    service.ts                      # getSettings()/updateSettings() over app_settings
   chores/
     service.ts                     # all business logic (below) — pure, no Express types
     routes.ts                       # thin Express layer over service.ts
+    timezone.ts                     # Intl-based zoned day/week math (see §4.2) — no date library dependency
   app.ts                             # wires routers + static file serving
   index.ts                            # runs migrations, starts the HTTP server
 ```
@@ -224,17 +261,23 @@ working from every device, not just `localhost`.
 ### 4.2 Chore business logic (`chores/service.ts`)
 
 This is the part worth reading closely — it's the one file with real logic,
-everything else is CRUD plumbing. All dates are handled in **UTC**
-throughout — no per-user timezone support, a deliberate simplification.
+everything else is CRUD plumbing. All day/week boundaries are computed in the
+**household's configured timezone** (`app_settings.timezone`, an IANA name
+like `America/New_York`, default `UTC`) via `chores/timezone.ts` — a small,
+dependency-free module built on `Intl.DateTimeFormat`, not a date library.
+Every calling function in `service.ts` reads the current timezone itself
+(`householdTimezone()` / `getSettings()`) rather than taking it as a
+parameter threaded in from routes — internal implementation detail, not part
+of the public function signatures.
 
 **Period keys** — what makes the "can't complete a chore twice in the same
 period" rule work:
 
 ```ts
-function computePeriodKey(frequency: Frequency, now: Date): string {
-  if (frequency === "daily") return toDateKey(now);              // '2026-07-09'
-  if (frequency === "weekly") return toDateKey(getWeekStart(now)); // that week's Monday
-  return toMonthKey(now);                                          // '2026-07'
+function computePeriodKey(frequency: Frequency, now: Date, timeZone: string): string {
+  if (frequency === "daily") return zonedDateKey(now, timeZone);                        // '2026-07-09'
+  if (frequency === "weekly") return zonedDateKey(zonedWeekStart(now, timeZone), timeZone); // that week's Monday
+  return zonedMonthKey(now, timeZone);                                                   // '2026-07'
 }
 ```
 
@@ -244,21 +287,14 @@ it (un-complete); if not, insert one. This makes "tap to complete" naturally
 idempotent per period without any separate "already done" flag to keep in
 sync.
 
-**Week start = Monday**, always:
-
-```ts
-function getWeekStart(d: Date): Date {
-  const day = d.getUTCDay();        // 0=Sun..6=Sat
-  const diffToMonday = (day + 6) % 7;
-  const start = startOfUTCDate(d);
-  start.setUTCDate(start.getUTCDate() - diffToMonday);
-  return start;
-}
-```
-
-So a week always runs Monday 00:00 UTC through the following Monday 00:00
-UTC (exclusive) — i.e. it **ends on Sunday**, which is what the weekly
-history feature (§1) depends on.
+**Week start = Monday**, always, in the household's timezone:
+`zonedWeekStart()` resolves the correct local calendar date for `now`, walks
+back to that week's Monday as pure Y-M-D arithmetic, then re-derives the
+precise UTC instant of local midnight for *that* date — deliberately not
+implemented as "subtract N × 86400000ms," which would drift by an hour if a
+DST transition falls inside the week. A week always runs Monday 00:00 through
+the following Monday 00:00 local time (exclusive) — i.e. it **ends on
+Sunday**, which is what the weekly history feature (§1) depends on.
 
 **Weekly history** — the day-strip + previous-weeks summary:
 
@@ -274,37 +310,32 @@ export interface WeekSummary {
   weekStart: string;  // Monday, 'YYYY-MM-DD'
   weekEnd: string;    // Sunday, 'YYYY-MM-DD'
   stars: number;
-  threshold: number;         // today's reward_rules.daily_star_goal * 7 (see the nuance in §3)
+  threshold: number;         // live goal for the current week; historical snapshot for past weeks (see §3)
   rewardEarned: boolean;
   isCurrent: boolean;
   days: DayStars[];   // always 7 entries, Monday first
 }
 
-const PAST_WEEKS_SHOWN = 4;
-
-function computeWeeklyHistory(userId: string, weeklyThreshold: number): WeekSummary[] {
+function computeWeeklyHistory(userId: string, timeZone: string, historyWeeksShown: number): WeekSummary[] {
   const now = new Date();
-  const today = startOfUTCDate(now);
-  const currentWeekStart = getWeekStart(now);
+  const today = zonedDayStart(now, timeZone);
+  const currentWeekStart = zonedWeekStart(now, timeZone);
 
   const weeks: WeekSummary[] = [];
-  for (let i = 0; i <= PAST_WEEKS_SHOWN; i++) {
+  for (let i = 0; i <= historyWeeksShown; i++) {
     const weekStartDate = new Date(currentWeekStart.getTime() - i * 7 * 86400000);
-    const weekEndDate = new Date(weekStartDate.getTime() + 6 * 86400000);
+    const weekStartKey = zonedDateKey(weekStartDate, timeZone);
+    // The current, still-open week always reflects the live goal; only
+    // completed weeks are frozen to the goal in effect when they started.
+    const weeklyThreshold =
+      i === 0 ? getRewardRule(userId).dailyStarGoal * 7 : getEffectiveDailyGoal(userId, weekStartKey) * 7;
 
-    const days: DayStars[] = [];
-    for (let d = 0; d < 7; d++) {
-      const dayDate = new Date(weekStartDate.getTime() + d * 86400000);
-      const isFuture = dayDate > today;
-      const stars = isFuture ? 0 : sumStars(userId, dayStartTs(dayDate), dayEndTs(dayDate));
-      days.push({ date: toDateKey(dayDate), stars, isToday: sameDay(dayDate, today), isFuture });
-    }
+    // ...days loop, sumStars() per day and for the whole week, as before...
 
-    const weekStars = sumStars(userId, weekStartTs(weekStartDate), weekEndTs(weekStartDate));
     weeks.push({
-      weekStart: toDateKey(weekStartDate),
-      weekEnd: toDateKey(weekEndDate),
-      stars: weekStars,
+      weekStart: weekStartKey,
+      weekEnd: /* Sunday of this week */,
+      stars: /* sumStars() for the week */,
       threshold: weeklyThreshold,
       rewardEarned: weeklyThreshold > 0 && weekStars >= weeklyThreshold,
       isCurrent: i === 0,
@@ -319,15 +350,24 @@ function computeWeeklyHistory(userId: string, weeklyThreshold: number): WeekSumm
 `chore_completions` to `chores` and summing `stars` for completions in
 `[start, end)` — this is what actually answers "how many stars on this day /
 in this week," independent of `period_key` (which only governs re-completion
-eligibility, not historical reporting). `PAST_WEEKS_SHOWN` is a plain
-constant in `chores/service.ts`, not configurable via the UI or env.
+eligibility, not historical reporting). `historyWeeksShown` comes from
+`app_settings` (default 4), configurable via `/api/settings` — no longer a
+hardcoded constant.
+
+`getEffectiveDailyGoal(userId, asOfDateKey)` looks up `reward_rule_history`
+for the most recent row with `effective_from <= asOfDateKey`; if none exists
+(a week from before history tracking began), it falls back to the live
+current goal — see the nuance in §3 for why the split between "current week"
+and "past weeks" exists.
 
 `computeProgress(userId)` (the "today / this week" tracker) also calls
 `computeWeeklyHistory` and returns it as a `weeks` field — so every place
 that already returns `Progress` (reward-rules endpoint, the toggle endpoint,
 the portal endpoint) gets the weekly history for free, no separate
-`/history` endpoint needed. Worth preserving that pattern for any future
-progress-related addition rather than adding a parallel endpoint.
+`/history` endpoint needed. Its top-level `weeklyThreshold`/`rewardEarned`
+are derived from `weeks[0]` rather than recomputed separately, so the "This
+week" progress bar always agrees with the current week's entry in the
+history list below it.
 
 ### 4.3 API reference
 
@@ -366,6 +406,8 @@ routes are deliberately public — the token in the URL *is* the credential.
 | GET | `/api/chores/links` | parent | each child's Child Portal URL (or null if never generated) |
 | POST | `/api/chores/links/:userId/regenerate` | parent | invalidates the old URL |
 | POST | `/api/import` | parent | body is a `chore-export.json` payload — creates children, reward rules, portal links, chores, and completions as fresh copies |
+| GET | `/api/settings` | parent | `{timezone, historyWeeksShown, availableTimezones}` |
+| PUT | `/api/settings` | parent | `{timezone, historyWeeksShown}` — `timezone` must be a recognized IANA name |
 | GET | `/api/portal/:token` | **none** | `{child, chores, progress}` — 404 on bad/revoked token |
 | POST | `/api/portal/:token/chores/:choreId/toggle` | **none** | 403 if the chore isn't assigned to that token's user |
 
@@ -411,7 +453,8 @@ client/src/
     Dashboard.tsx                     # the management interface — Parent-only, no role branch needed
     Users.tsx                          # the management interface's user admin: create/delete Parent +
                                          # Child profiles, set passwords, register/remove passkeys, import
-                                         # a chore-export.json from a previous version
+                                         # a chore-export.json from a previous version, and household
+                                         # settings (timezone, past-weeks-shown)
     ChildPortal.tsx                     # standalone, token-authenticated — NOT under AuthContext for
                                           # its data fetching, but mounts <ProfilePicker> as a takeover
                                           # overlay when "Parent sign-in" is tapped (see §5.3)
@@ -605,17 +648,19 @@ worth knowing about before "fixing" any of them:
   screen), that's a real, unmade tightening — it'd mean passing a flag into
   `ProfilePicker` to hide the password form when `onCancel` is set (i.e.
   when it's being used as the portal's embedded picker).
-- **Historical reward thresholds**: `WeekSummary.threshold` always reflects
-  *today's* reward rule, not what it was when that week happened (§3). Fine
-  for a family that rarely changes the goal; worth storing a snapshot if
-  that assumption stops holding.
-- **Timezone**: everything is UTC day/week boundaries. A family that cares
-  about exact midnight cutoffs in their local timezone would need a
-  `timezone` column on `users` threaded through `service.ts`'s date math.
-- **How many past weeks to show**: hardcoded to 4 (`PAST_WEEKS_SHOWN` in
-  `chores/service.ts`). Trivial to make configurable if useful.
+- **Timezone is household-level, not per-user**: `app_settings.timezone`
+  applies to every child and parent alike. Fine for the app's actual usage
+  model (one physical household), but a family split across timezones would
+  need a `timezone` column on `users` instead — a bigger change, not
+  attempted here since there's no evidence anyone needs it.
 - **Re-importing via `/api/import` creates fresh copies, not a merge**: two
   imports of the same export produce duplicate children/chores rather than
   deduplicating by name. Intentional — a silent merge felt more surprising
   than a duplicate you can delete — but worth knowing before relying on it
   for repeated imports.
+
+Resolved, previously listed here: historical reward thresholds now snapshot
+correctly (`reward_rule_history`, §3), day/week boundaries respect a
+configurable household timezone instead of hardcoded UTC (`chores/timezone.ts`),
+and the number of past weeks shown is a household setting instead of the
+`PAST_WEEKS_SHOWN` constant.
