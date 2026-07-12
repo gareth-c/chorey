@@ -19,6 +19,10 @@ function getCookie(req: Request, name: string): string | undefined {
 }
 
 export function createSession(res: Response, userId: string) {
+  // Opportunistic housekeeping: expired rows are already invisible to
+  // getSessionUser, but without this they'd accumulate forever.
+  db.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')").run();
+
   const token = nanoid(32);
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
   db.prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)").run(

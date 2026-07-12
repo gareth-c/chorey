@@ -1,7 +1,14 @@
 import { nanoid } from "nanoid";
 import { db } from "../db/client";
 import { getSettings } from "../settings/service";
-import { zonedDateKey, zonedDayStart, zonedMonthKey, zonedWeekStart, toSqliteDatetime } from "./timezone";
+import {
+  zonedAddDays,
+  zonedDateKey,
+  zonedDayStart,
+  zonedMonthKey,
+  zonedWeekStart,
+  toSqliteDatetime,
+} from "./timezone";
 
 export type Frequency = "daily" | "weekly" | "monthly";
 
@@ -76,7 +83,7 @@ function computeWeeklyHistory(userId: string, timeZone: string, historyWeeksShow
 
   const weeks: WeekSummary[] = [];
   for (let i = 0; i <= historyWeeksShown; i++) {
-    const weekStartDate = new Date(currentWeekStart.getTime() - i * 7 * 86400000);
+    const weekStartDate = zonedAddDays(currentWeekStart, -i * 7, timeZone);
     const weekStartKey = zonedDateKey(weekStartDate, timeZone);
     // The current, still-open week always reflects the live goal — a parent
     // adjusting it today shouldn't feel ignored until next Monday. Only
@@ -86,14 +93,14 @@ function computeWeeklyHistory(userId: string, timeZone: string, historyWeeksShow
 
     const days: DayStars[] = [];
     for (let d = 0; d < 7; d++) {
-      const dayDate = zonedDayStart(new Date(weekStartDate.getTime() + d * 86400000), timeZone);
+      const dayDate = zonedAddDays(weekStartDate, d, timeZone);
       const isFuture = dayDate > today;
       const stars = isFuture
         ? 0
         : sumStars(
             userId,
             toSqliteDatetime(dayDate),
-            toSqliteDatetime(zonedDayStart(new Date(dayDate.getTime() + 86400000), timeZone))
+            toSqliteDatetime(zonedAddDays(dayDate, 1, timeZone))
           );
       days.push({
         date: zonedDateKey(dayDate, timeZone),
@@ -103,8 +110,8 @@ function computeWeeklyHistory(userId: string, timeZone: string, historyWeeksShow
       });
     }
 
-    const weekEndDate = zonedDayStart(new Date(weekStartDate.getTime() + 6 * 86400000), timeZone);
-    const nextWeekStart = zonedDayStart(new Date(weekStartDate.getTime() + 7 * 86400000), timeZone);
+    const weekEndDate = zonedAddDays(weekStartDate, 6, timeZone);
+    const nextWeekStart = zonedAddDays(weekStartDate, 7, timeZone);
     const weekStars = sumStars(userId, toSqliteDatetime(weekStartDate), toSqliteDatetime(nextWeekStart));
 
     weeks.push({
@@ -134,9 +141,9 @@ export function computeProgress(userId: string): Progress {
   const { timezone, historyWeeksShown } = getSettings();
   const now = new Date();
   const todayStart = zonedDayStart(now, timezone);
-  const todayEnd = zonedDayStart(new Date(todayStart.getTime() + 86400000), timezone);
+  const todayEnd = zonedAddDays(todayStart, 1, timezone);
   const weekStartDate = zonedWeekStart(now, timezone);
-  const weekEndDate = zonedDayStart(new Date(weekStartDate.getTime() + 7 * 86400000), timezone);
+  const weekEndDate = zonedAddDays(weekStartDate, 7, timezone);
 
   const starsToday = sumStars(userId, toSqliteDatetime(todayStart), toSqliteDatetime(todayEnd));
   const starsThisWeek = sumStars(userId, toSqliteDatetime(weekStartDate), toSqliteDatetime(weekEndDate));

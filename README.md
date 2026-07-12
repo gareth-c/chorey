@@ -107,6 +107,7 @@ Copy `.env.example` to `.env` (next to `docker-compose.yml`) and adjust:
 | Variable         | Default                   | Notes                                                         |
 | ---------------- | ------------------------- | ------------------------------------------------------------- |
 | `PORT`           | `5152`                    | Port the server listens on (and the published container port).|
+| `TRUST_PROXY`    | `1`                       | Reverse-proxy hops in front of the app. `1` fits the usual single HTTPS proxy; `0` if browsers hit Node directly. Needed for login rate limiting to see real client IPs. |
 | `SESSION_SECRET` | `change-me-in-production` | **Set a real one** — e.g. `openssl rand -hex 32`.             |
 | `RP_ID`          | `localhost`               | WebAuthn relying-party ID (a hostname, no scheme/port).       |
 | `RP_NAME`        | `Chorey`                  | Name shown in the passkey prompt.                             |

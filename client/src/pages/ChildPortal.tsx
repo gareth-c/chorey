@@ -27,6 +27,7 @@ export default function ChildPortal() {
   const { token = "" } = useParams();
   const [data, setData] = useState<PortalData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
   const [showParentSignIn, setShowParentSignIn] = useState(false);
 
   const load = useCallback(async () => {
@@ -43,8 +44,13 @@ export default function ChildPortal() {
   }, [load]);
 
   async function handleToggle(choreId: string) {
-    await api.post(`/portal/${token}/chores/${choreId}/toggle`);
-    await load();
+    setToggleError(null);
+    try {
+      await api.post(`/portal/${token}/chores/${choreId}/toggle`);
+      await load();
+    } catch (err) {
+      setToggleError(getErrorMessage(err));
+    }
   }
 
   if (showParentSignIn) {
@@ -71,6 +77,11 @@ export default function ChildPortal() {
 
   return (
     <div className="min-h-screen p-6">
+      {toggleError && (
+        <p className="mx-auto mb-4 max-w-xl rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-300">
+          {toggleError}
+        </p>
+      )}
       <ChoreChecklist
         childName={data.child.name}
         avatarEmoji={data.child.avatarEmoji}

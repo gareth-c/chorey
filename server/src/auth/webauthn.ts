@@ -24,8 +24,13 @@ function saveChallenge(userId: string, challenge: string) {
 }
 
 function takeChallenge(userId: string): string | null {
+  // A ceremony should complete within minutes of the options call — treat
+  // anything older as expired rather than redeemable indefinitely.
   const row = db
-    .prepare("SELECT challenge FROM webauthn_challenges WHERE user_id = ?")
+    .prepare(
+      `SELECT challenge FROM webauthn_challenges
+       WHERE user_id = ? AND created_at > datetime('now', '-5 minutes')`
+    )
     .get(userId) as { challenge: string } | undefined;
   db.prepare("DELETE FROM webauthn_challenges WHERE user_id = ?").run(userId);
   return row?.challenge ?? null;

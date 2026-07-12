@@ -610,6 +610,7 @@ reserved for selection/focus states.
 |---|---|---|
 | `PORT` | `5152` | the port the server listens on |
 | `DATA_DIR` | `./data` | where `chores.db` (+ WAL/SHM) lives |
+| `TRUST_PROXY` | `1` | Express `trust proxy` hop count. With a reverse proxy in front (the documented HTTPS setup), the login rate limiter must key on `X-Forwarded-For`'s real client IP — and `express-rate-limit` v7 errors outright if that header arrives while trust proxy is off. Set `0` only for direct, proxyless access |
 | `SESSION_SECRET` | insecure dev default | not actually used for cookie signing today (sessions are opaque DB-backed tokens, not signed JWTs) — kept as a placeholder if that ever changes |
 | `RP_ID` | `localhost` | WebAuthn Relying Party ID — must match the domain the app is served from for passkeys to work; see the secure-context caveat in §4.1 |
 | `RP_NAME` | `Chorey` | display name shown by the OS passkey prompt during registration |

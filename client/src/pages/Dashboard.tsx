@@ -53,6 +53,8 @@ export default function Dashboard() {
   const [frequency, setFrequency] = useState<Frequency>("daily");
   const [stars, setStars] = useState("1");
   const [error, setError] = useState<string | null>(null);
+  const [rulesError, setRulesError] = useState<string | null>(null);
+  const [linksError, setLinksError] = useState<string | null>(null);
 
   async function load() {
     const [{ chores }, { users }, { rules }, { links }] = await Promise.all([
@@ -102,28 +104,50 @@ export default function Dashboard() {
 
   async function handleDeleteChore(id: string) {
     if (!confirm("Delete this chore?")) return;
-    await api.delete(`/chores/${id}`);
-    await load();
+    setError(null);
+    try {
+      await api.delete(`/chores/${id}`);
+      await load();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
   }
 
   async function handleSaveRule(userId: string) {
     const draft = ruleDrafts[userId];
-    await api.put(`/chores/reward-rules/${userId}`, {
-      dailyStarGoal: parseInt(draft.goal, 10) || 0,
-      weeklyReward: draft.reward,
-    });
-    await load();
+    setRulesError(null);
+    try {
+      await api.put(`/chores/reward-rules/${userId}`, {
+        dailyStarGoal: parseInt(draft.goal, 10) || 0,
+        weeklyReward: draft.reward,
+      });
+      await load();
+    } catch (err) {
+      setRulesError(getErrorMessage(err));
+    }
   }
 
   async function handleRegenerateLink(userId: string) {
-    await api.post<{ url: string }>(`/chores/links/${userId}/regenerate`);
-    await load();
+    setLinksError(null);
+    try {
+      await api.post<{ url: string }>(`/chores/links/${userId}/regenerate`);
+      await load();
+    } catch (err) {
+      setLinksError(getErrorMessage(err));
+    }
   }
 
   async function handleCopy(url: string) {
-    await navigator.clipboard.writeText(url);
-    setCopiedUrl(url);
-    setTimeout(() => setCopiedUrl(null), 1500);
+    setLinksError(null);
+    try {
+      // Clipboard API is unavailable outside secure contexts (e.g. plain
+      // http over LAN) — surface that instead of failing silently.
+      await navigator.clipboard.writeText(url);
+      setCopiedUrl(url);
+      setTimeout(() => setCopiedUrl(null), 1500);
+    } catch {
+      setLinksError("Couldn't copy — select the link text and copy it manually.");
+    }
   }
 
   const header = (
@@ -284,6 +308,9 @@ export default function Dashboard() {
 
       <div className="card">
         <h2 className="mb-4 text-lg font-medium text-slate-900 dark:text-white">Reward rules</h2>
+        {rulesError && (
+          <p className="mb-3 text-sm text-red-600 dark:text-red-400">{rulesError}</p>
+        )}
         <div className="space-y-5">
           {rules.map((rule) => (
             <div
@@ -362,6 +389,9 @@ export default function Dashboard() {
           management interface from the shared device, gated by your password or passkey.
           Regenerating a link replaces the old one (useful if a device is lost).
         </p>
+        {linksError && (
+          <p className="mb-3 text-sm text-red-600 dark:text-red-400">{linksError}</p>
+        )}
         <div className="space-y-3">
           {links.map((link) => (
             <div

@@ -10,6 +10,13 @@ import { getErrorMessage } from "../utils/errors";
 export const importRouter = Router();
 importRouter.use(requireAuth);
 
+// All stored datetimes are compared as strings against datetime('now')'s
+// format — a malformed timestamp wouldn't error, it would just silently fall
+// outside every sumStars() range and vanish from the charts. Reject it here.
+const sqliteDatetime = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/, "must be 'YYYY-MM-DD HH:MM:SS'");
+
 // Shape of a `chore-export.json` from an older Chore Tracker. We only read the
 // source-of-truth fields (children, reward rules, chores, completions) — the
 // derived `progress`/`weeks`/`days` in the export are ignored, since the app
@@ -37,13 +44,13 @@ const importSchema = z.object({
         assignedTo: z.string(),
         frequency: z.enum(["daily", "weekly", "monthly"]),
         stars: z.number().int().min(1).max(100),
-        createdAt: z.string().optional(),
-        updatedAt: z.string().optional(),
+        createdAt: sqliteDatetime.optional(),
+        updatedAt: sqliteDatetime.optional(),
         completions: z
           .array(
             z.object({
               periodKey: z.string().min(1),
-              completedAt: z.string().optional(),
+              completedAt: sqliteDatetime.optional(),
             })
           )
           .default([]),

@@ -28,6 +28,7 @@ export default function Users() {
   const [role, setRole] = useState<"parent" | "child">("child");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [manageError, setManageError] = useState<string | null>(null);
   const [passwordDraft, setPasswordDraft] = useState<Record<string, string>>({});
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -96,24 +97,40 @@ export default function Users() {
 
   async function handleDelete(id: string) {
     if (!confirm("Remove this profile? This cannot be undone.")) return;
-    await api.delete(`/users/${id}`);
-    await load();
+    setManageError(null);
+    try {
+      await api.delete(`/users/${id}`);
+      await load();
+    } catch (err) {
+      setManageError(getErrorMessage(err));
+    }
   }
 
   async function handleSetPassword(id: string) {
     const value = passwordDraft[id];
     if (!value) return;
-    await api.post(`/users/${id}/password`, { password: value });
-    setPasswordDraft((d) => ({ ...d, [id]: "" }));
-    await load();
+    setManageError(null);
+    try {
+      await api.post(`/users/${id}/password`, { password: value });
+      setPasswordDraft((d) => ({ ...d, [id]: "" }));
+      await load();
+    } catch (err) {
+      setManageError(getErrorMessage(err));
+    }
   }
 
   async function handleRemovePassword(id: string) {
-    await api.delete(`/users/${id}/password`);
-    await load();
+    setManageError(null);
+    try {
+      await api.delete(`/users/${id}/password`);
+      await load();
+    } catch (err) {
+      setManageError(getErrorMessage(err));
+    }
   }
 
   async function handleAddPasskey(id: string) {
+    setManageError(null);
     try {
       const options = await api.post<PublicKeyCredentialCreationOptionsJSON>(
         `/users/${id}/passkey/register/options`
@@ -122,13 +139,18 @@ export default function Users() {
       await api.post(`/users/${id}/passkey/register/verify`, { response });
       await load();
     } catch (err) {
-      alert(getErrorMessage(err));
+      setManageError(getErrorMessage(err));
     }
   }
 
   async function handleRemovePasskey(id: string) {
-    await api.delete(`/users/${id}/passkey`);
-    await load();
+    setManageError(null);
+    try {
+      await api.delete(`/users/${id}/passkey`);
+      await load();
+    } catch (err) {
+      setManageError(getErrorMessage(err));
+    }
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -171,6 +193,9 @@ export default function Users() {
       </div>
 
       <div className="card mb-8 space-y-3">
+        {manageError && (
+          <p className="text-sm text-red-600 dark:text-red-400">{manageError}</p>
+        )}
         {users.map((u) => (
           <div
             key={u.id}

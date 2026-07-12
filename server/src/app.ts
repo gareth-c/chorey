@@ -9,9 +9,21 @@ import { settingsRouter } from "./routes/settings.routes";
 import { requireAuth } from "./middleware/requireAuth";
 import { registerRoutes as registerChoreRoutes } from "./chores/routes";
 import { version } from "./version";
+import { env } from "./env";
 
 export function createApp() {
   const app = express();
+
+  // Behind a reverse proxy (the documented HTTPS deployment), Express must
+  // trust X-Forwarded-For — otherwise the login rate limiter keys every
+  // client to the proxy's own IP (one shared attempt bucket for the whole
+  // household), and express-rate-limit v7 hard-errors on the mismatch.
+  app.set("trust proxy", env.trustProxy);
+
+  // A multi-year chore-export.json easily exceeds express.json's 100kb
+  // default — allow bigger bodies on the import route only, so the public
+  // endpoints keep the small default.
+  app.use("/api/import", express.json({ limit: "10mb" }));
   app.use(express.json());
   app.use(cookieParser());
 

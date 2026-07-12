@@ -47,6 +47,10 @@ port; in dev, Vite proxies `/api` to the server (`client/vite.config.ts`).
 - `/api/auth/login` and `/api/auth/login/passkey/verify` are rate-limited
   (`express-rate-limit`, 10 attempts / 15 min per IP) — a deliberate fix for
   an online brute-force gap, don't strip it out when touching those routes.
+  Per-IP keying depends on `app.set("trust proxy", env.trustProxy)` in
+  `app.ts` (`TRUST_PROXY`, default 1 hop): without it, every client behind
+  the reverse proxy shares one bucket and `express-rate-limit` v7 500s on
+  the `X-Forwarded-For` mismatch.
 - `ProfilePicker` (`client/src/pages/ProfilePicker.tsx`) behaves differently
   depending on whether `onCancel` is passed — that's how it tells `/login`
   apart from its embedded use as the Child Portal's "Parent sign-in" picker.

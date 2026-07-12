@@ -85,6 +85,16 @@ export function zonedWeekStart(date: Date, timeZone: string): Date {
   return localMidnightUTC(shiftYMD(ymd, -diffToMonday), timeZone);
 }
 
+/**
+ * Local midnight of the calendar day `days` after (or before, if negative)
+ * the day `date` falls on in `timeZone`. Pure calendar arithmetic on the
+ * local Y-M-D — never "instant ± N×24h", which lands an hour off whenever a
+ * DST transition sits between the two instants.
+ */
+export function zonedAddDays(date: Date, days: number, timeZone: string): Date {
+  return localMidnightUTC(shiftYMD(zonedYMD(date, timeZone), days), timeZone);
+}
+
 /** Format a UTC Date as a SQLite-comparable 'YYYY-MM-DD HH:MM:SS' string (matches datetime('now')'s format). */
 export function toSqliteDatetime(date: Date): string {
   return date.toISOString().slice(0, 19).replace("T", " ");

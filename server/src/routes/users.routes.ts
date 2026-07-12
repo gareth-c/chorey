@@ -92,11 +92,36 @@ usersRouter.put("/:id", requireRole("parent"), (req, res) => {
     res.status(404).json({ error: "User not found" });
     return;
   }
-  const next = { ...existing, ...parsed.data };
+
+  const nextRole = parsed.data.role ?? existing.role;
+  if (nextRole !== existing.role) {
+    // A sole parent demoting themselves would permanently lock the household
+    // out of the management interface (sessions read the role live).
+    if (req.user!.id === existing.id) {
+      res.status(400).json({ error: "You can't change your own role" });
+      return;
+    }
+    if (existing.role === "parent") {
+      const parentCount = (
+        db.prepare("SELECT COUNT(*) as c FROM users WHERE role = 'parent'").get() as { c: number }
+      ).c;
+      if (parentCount <= 1) {
+        res.status(400).json({ error: "Can't demote the only Parent profile" });
+        return;
+      }
+      // Child profiles categorically have no credentials or sessions — strip
+      // them as part of the demotion rather than leaving a Child row that
+      // could still sign in.
+      db.prepare("UPDATE users SET password_hash = NULL WHERE id = ?").run(existing.id);
+      db.prepare("DELETE FROM webauthn_credentials WHERE user_id = ?").run(existing.id);
+      db.prepare("DELETE FROM sessions WHERE user_id = ?").run(existing.id);
+    }
+  }
+
   db.prepare("UPDATE users SET name = ?, avatar_emoji = ?, role = ? WHERE id = ?").run(
-    next.name,
-    next.avatar_emoji,
-    next.role,
+    parsed.data.name ?? existing.name,
+    parsed.data.avatarEmoji ?? existing.avatar_emoji,
+    nextRole,
     existing.id
   );
   res.json({ user: toPublicUser(getUser(existing.id)!) });

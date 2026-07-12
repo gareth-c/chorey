@@ -7,6 +7,7 @@ services:
       - ./data:/app/data
     environment:
       - PORT=${PORT:-5152}
+      - TRUST_PROXY=${TRUST_PROXY:-1}
       - SESSION_SECRET=${SESSION_SECRET:-change-me-in-production}
       - RP_ID=${RP_ID:-localhost}
       - RP_NAME=${RP_NAME:-Chorey}
