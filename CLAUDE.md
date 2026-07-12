@@ -156,18 +156,25 @@ commit. **Pull before pushing again** (`git pull --rebase`) or a second push
 right after the first will be rejected as non-fast-forward. If you have local
 changes when that happens: `git stash && git pull --rebase && git stash pop`.
 
-The workflow also runs on pull requests, but only to build the image as a
-build-only check (`docker/build-push-action` with `push: false`) — it never
-bumps `version.json` or logs into the registry on a PR. On `main`, the image
-is tagged `latest` plus a short-sha tag via `docker/metadata-action`, and
-layers are cached through the GitHub Actions cache (`cache-from`/`cache-to:
-type=gha`).
+On a PR, only the `build-pr` job runs: a single-platform (`linux/amd64`),
+`push: false` build that never touches `version.json` or the registry — it
+only has to prove the Dockerfile still builds.
 
-On `main`, the image is built for **both `linux/amd64` and `linux/arm64`**
-(`docker/setup-qemu-action` emulates the arm64 leg on the amd64 runner) —
-that's what makes `docker-compose.yml`'s pulled image usable on a Raspberry
-Pi or an ARM NAS. Multi-platform output requires pushing to a registry (you
-can't `docker load` more than one platform into the local image store at
-once), so PR builds stay single-platform (`linux/amd64` only) since they
-never push — don't add `linux/arm64` to the PR leg without also flipping
-`push: true` there.
+On a push to `main`, four jobs run in sequence/parallel: `version` bumps and
+pushes the `version.json` commit first; `build` then builds
+`linux/amd64` and `linux/arm64` **each on its own native runner**
+(`ubuntu-latest` / `ubuntu-24.04-arm`) and pushes each by digest, not by
+tag; `merge` downloads both digests and assembles them into one multi-arch
+manifest under `latest` + a short-sha tag via `docker buildx imagetools
+create`. This is what makes `docker-compose.yml`'s pulled image resolve to
+the right architecture on a Raspberry Pi or an ARM NAS.
+
+**Don't reintroduce QEMU for the `linux/arm64` leg.** It was tried first
+(`docker/setup-qemu-action` emulating arm64 on the `amd64` runner) and
+reliably SIGILL-crashed partway through `npm install` — emulated Node.js's
+V8 JIT hitting an instruction QEMU's translator gets wrong is a known,
+effectively unfixable QEMU incompatibility for this kind of native-addon
+build (`better-sqlite3`), not something a QEMU version bump resolves.
+Native `ubuntu-24.04-arm` runners sidestep the problem entirely and are
+free for public repos — that's why the per-platform builds are a runner
+matrix instead of a single job with `platforms: linux/amd64,linux/arm64`.

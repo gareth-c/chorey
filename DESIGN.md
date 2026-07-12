@@ -623,8 +623,11 @@ copy both plus `node_modules` (prod only) and `version.json` into a
 root-owned, bind-mounted) `data/` directory before dropping privileges, so
 this works on a fresh Linux host as well as locally. `data/` is a
 bind-mounted volume so the SQLite file survives container restarts/rebuilds.
-The published image is multi-arch (`linux/amd64` + `linux/arm64`), built via
-Buildx with QEMU emulating the arm64 leg in CI.
+The published image is multi-arch (`linux/amd64` + `linux/arm64`) — CI
+builds each platform natively on its own runner (not QEMU emulation, which
+reliably crashes compiling `better-sqlite3`'s native addon under emulated
+Node.js) and merges them into one manifest; see CLAUDE.md's "Build
+versioning" section for the full pipeline shape.
 
 Two compose files, same service shape, different image source:
 

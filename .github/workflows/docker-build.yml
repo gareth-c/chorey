@@ -10,11 +10,14 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  build:
+  # Bumps and commits version.json before anything builds, so the image
+  # (which COPYs version.json in) reports the label it's actually built
+  # under. Only on pushes to main — never on PRs, which never merge.
+  version:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,9 +25,8 @@ jobs:
           fetch-depth: 0 # needed so the push-back below works cleanly
 
       - name: Bump version
-        if: github.event_name != 'pull_request'
         run: |
-          python << 'EOF'
+          python3 << 'EOF'
           import json
           from pathlib import Path
           from datetime import datetime
@@ -47,7 +49,6 @@ jobs:
           EOF
 
       - name: Commit version bump
-        if: github.event_name != 'pull_request'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Actions"
@@ -55,14 +56,61 @@ jobs:
           git commit -m "Bump version [skip ci]" || echo "No changes to commit"
           git push
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+  # Build-only validation for PRs — single platform (the runner's own
+  # amd64), never pushed. No QEMU, no multi-arch dance; this just needs to
+  # prove the Dockerfile still builds.
+  build-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: chorey:pr-validate
+          cache-from: type=gha,scope=build-linux/amd64
+          cache-to: type=gha,mode=max,scope=build-linux/amd64
+
+  # Real per-platform builds, each pushed to the registry by digest (not by
+  # tag yet — `merge` below assembles the final multi-arch manifest from
+  # these digests). linux/arm64 runs on a native ARM64 runner rather than
+  # QEMU emulation: emulated Node.js reliably SIGILLs mid-`npm install`
+  # under this repo's better-sqlite3 native build (a known, effectively
+  # unfixable QEMU/V8-JIT incompatibility, not something a QEMU version
+  # bump resolves) — native hardware sidesteps it entirely, and GitHub's
+  # hosted arm64 runners are free for public repos.
+  build:
+    if: github.event_name != 'pull_request'
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      packages: write
+    steps:
+      - name: Prepare
+        run: echo "PLATFORM_PAIR=${PLATFORM//\//-}" >> "$GITHUB_ENV"
+        env:
+          PLATFORM: ${{ matrix.platform }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main # pick up the version-bump commit `version` just pushed
+
+      - uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -70,6 +118,61 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Registry paths must be lowercase; github.repository preserves the repo's actual casing.
+      - name: Compute lowercase image name
+        id: image
+        run: echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=build-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=build-${{ matrix.platform }}
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Assembles the per-platform digests from `build` into one multi-arch
+  # manifest under the real tags (latest + short-sha) — this is the step
+  # that actually makes `docker pull ghcr.io/.../chorey:latest` resolve to
+  # the right image for whichever architecture is pulling.
+  merge:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Compute lowercase image name
         id: image
         run: echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
@@ -83,17 +186,14 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
 
-      - name: Build (and push on main)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          # Multi-arch manifests can only be assembled when pushing to a
-          # registry — docker can't load more than one platform into the
-          # local image store at once. PR validation builds (push: false)
-          # stay single-platform (the runner's own amd64) for that reason.
-          platforms: ${{ github.event_name != 'pull_request' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          tags=$(echo "${{ steps.meta.outputs.tags }}" | sed 's/^/-t /' | tr '\n' ' ')
+          image="${{ env.REGISTRY }}/${{ steps.image.outputs.name }}"
+          # shellcheck disable=SC2046
+          docker buildx imagetools create $tags $(printf "$image@sha256:%s " *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ steps.meta.outputs.version }}
