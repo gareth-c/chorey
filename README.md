@@ -114,16 +114,29 @@ from a previous version:
 ## Run with Docker
 
 The app listens on **port 5152** and stores its SQLite database in a `data/`
-volume.
+volume. Every push to `main` publishes an image to the [GitHub Container
+Registry](https://github.com/gareth-c/chorey/pkgs/container/chorey) at
+`ghcr.io/gareth-c/chorey`, tagged `latest` — that's the fastest way to run
+it, no local build required:
 
 ```bash
-docker compose up -d --build     # build and start
-docker compose logs -f           # follow logs
-docker compose down              # stop
+docker compose up -d       # pull ghcr.io/gareth-c/chorey:latest and start
+docker compose logs -f     # follow logs
+docker compose down        # stop
 ```
 
 Then open <http://localhost:5152> — first run drops you into the setup wizard
 to create the initial Parent account.
+
+The published image is multi-arch (`linux/amd64` and `linux/arm64`) — it
+runs as-is on a Raspberry Pi or an ARM-based NAS, no separate build needed.
+
+To build the image from source instead (e.g. while working on the code),
+use [`docker-compose-local-build.yml`](docker-compose-local-build.yml):
+
+```bash
+docker compose -f docker-compose-local-build.yml up -d --build
+```
 
 ### Configuration
 
@@ -161,9 +174,10 @@ cd client && npm install && npm run dev
 ## Repository layout
 
 ```
-server/    Express + better-sqlite3 API; also serves the built client in prod
-client/    React + Vite single-page app (management interface + Child Portal)
-Dockerfile             multi-stage build (client build → server build → runtime)
-docker-compose.yml     one service, publishes 5152, mounts ./data
-DESIGN.md              full design + API reference
+server/                          Express + better-sqlite3 API; also serves the built client in prod
+client/                          React + Vite single-page app (management interface + Child Portal)
+Dockerfile                       multi-stage build (client build → server build → runtime)
+docker-compose.yml               pulls the published ghcr.io image, publishes 5152, mounts ./data
+docker-compose-local-build.yml   same, but builds the image from source instead of pulling
+DESIGN.md                        full design + API reference
 ```

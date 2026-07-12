@@ -55,6 +55,9 @@ jobs:
           git commit -m "Bump version [skip ci]" || echo "No changes to commit"
           git push
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -84,6 +87,11 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          # Multi-arch manifests can only be assembled when pushing to a
+          # registry — docker can't load more than one platform into the
+          # local image store at once. PR validation builds (push: false)
+          # stay single-platform (the runner's own amd64) for that reason.
+          platforms: ${{ github.event_name != 'pull_request' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

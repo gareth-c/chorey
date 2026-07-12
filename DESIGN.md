@@ -623,12 +623,16 @@ copy both plus `node_modules` (prod only) and `version.json` into a
 root-owned, bind-mounted) `data/` directory before dropping privileges, so
 this works on a fresh Linux host as well as locally. `data/` is a
 bind-mounted volume so the SQLite file survives container restarts/rebuilds.
+The published image is multi-arch (`linux/amd64` + `linux/arm64`), built via
+Buildx with QEMU emulating the arm64 leg in CI.
+
+Two compose files, same service shape, different image source:
 
 ```yaml
-# docker-compose.yml
+# docker-compose.yml — pulls the published image
 services:
   chorey:
-    build: .
+    image: ghcr.io/gareth-c/chorey:latest
     ports: ["5152:5152"]
     volumes:
       - ./data:/app/data
@@ -638,6 +642,10 @@ services:
       - ORIGIN=${ORIGIN:-http://localhost:5152}
     restart: unless-stopped
 ```
+
+`docker-compose-local-build.yml` is identical except `image:` is replaced
+with `build: .` — for working on the code, or any platform the published
+image doesn't cover.
 
 Passkeys need a real HTTPS origin (or `localhost`) to work at all — see the
 secure-context caveat in §4.1. Put a reverse proxy (Caddy, Traefik, Nginx +

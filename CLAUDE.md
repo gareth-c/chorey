@@ -162,3 +162,12 @@ bumps `version.json` or logs into the registry on a PR. On `main`, the image
 is tagged `latest` plus a short-sha tag via `docker/metadata-action`, and
 layers are cached through the GitHub Actions cache (`cache-from`/`cache-to:
 type=gha`).
+
+On `main`, the image is built for **both `linux/amd64` and `linux/arm64`**
+(`docker/setup-qemu-action` emulates the arm64 leg on the amd64 runner) —
+that's what makes `docker-compose.yml`'s pulled image usable on a Raspberry
+Pi or an ARM NAS. Multi-platform output requires pushing to a registry (you
+can't `docker load` more than one platform into the local image store at
+once), so PR builds stay single-platform (`linux/amd64` only) since they
+never push — don't add `linux/arm64` to the PR leg without also flipping
+`push: true` there.

@@ -1,6 +1,6 @@
 services:
   chorey:
-    image: ghcr.io/gareth-c/chorey:latest
+    build: .
     ports:
       - "5152:5152"
     volumes:
