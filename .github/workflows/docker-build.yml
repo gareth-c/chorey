@@ -1,77 +1,91 @@
 name: Docker build
 
-# Bump the build number, commit it back, then build and push the image.
-# Only on real pushes to main — never on PRs (those builds never merge).
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
-permissions:
-  contents: write # push the version-bump commit back to main
-  packages: write # push the image to GHCR
+env:
+  REGISTRY: ghcr.io
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # needed so the push-back below works cleanly
 
       - name: Bump version
+        if: github.event_name != 'pull_request'
         run: |
-          python3 << 'EOF'
-          import json, os
+          python << 'EOF'
+          import json
           from pathlib import Path
           from datetime import datetime
-
           vfile = Path("version.json")
           if vfile.exists():
-              v = json.loads(vfile.read_text())
+              with open(vfile) as f:
+                  v = json.load(f)
           else:
               v = {"year": 2026, "month": 1, "build": 0}
-
           now = datetime.now()
-          # Reset the build counter on month rollover, otherwise increment.
+          # Reset build counter on month rollover, otherwise increment
           if v.get("year") == now.year and v.get("month") == now.month:
               v["build"] += 1
           else:
               v = {"year": now.year, "month": now.month, "build": 1}
-
-          vfile.write_text(json.dumps(v, indent=2) + "\n")
+          with open(vfile, "w") as f:
+              json.dump(v, f, indent=2)
+              f.write("\n")
           print(f"✓ Version updated: {v['year']}.{v['month']:02d} Build {v['build']}")
-
-          # Expose a docker-friendly tag (e.g. 2026.07.1) to later steps.
-          with open(os.environ["GITHUB_ENV"], "a") as f:
-              f.write(f"VERSION_TAG={v['year']}.{v['month']:02d}.{v['build']}\n")
           EOF
 
       - name: Commit version bump
+        if: github.event_name != 'pull_request'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Actions"
           git add version.json
-          # [skip ci] stops this commit from re-triggering the workflow.
           git commit -m "Bump version [skip ci]" || echo "No changes to commit"
           git push
 
-      - name: Compute image name
-        # GHCR requires an all-lowercase path.
-        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      # Registry paths must be lowercase; github.repository preserves the repo's actual casing.
+      - name: Compute lowercase image name
+        id: image
+        run: echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+
+      - name: Build (and push on main)
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
-          tags: |
-            ${{ env.IMAGE }}:latest
-            ${{ env.IMAGE }}:${{ env.VERSION_TAG }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

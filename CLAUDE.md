@@ -100,3 +100,10 @@ This means a push to `main` is always followed by an automated version-bump
 commit. **Pull before pushing again** (`git pull --rebase`) or a second push
 right after the first will be rejected as non-fast-forward. If you have local
 changes when that happens: `git stash && git pull --rebase && git stash pop`.
+
+The workflow also runs on pull requests, but only to build the image as a
+build-only check (`docker/build-push-action` with `push: false`) — it never
+bumps `version.json` or logs into the registry on a PR. On `main`, the image
+is tagged `latest` plus a short-sha tag via `docker/metadata-action`, and
+layers are cached through the GitHub Actions cache (`cache-from`/`cache-to:
+type=gha`).
