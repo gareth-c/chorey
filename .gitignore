@@ -15,3 +15,7 @@ data/*.db-*
 
 # OS/editor cruft
 .DS_Store
+
+# Personal Claude Code settings — .claude/settings.json (if ever added) is
+# fine to share, but settings.local.json is per-machine.
+.claude/settings.local.json
