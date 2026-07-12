@@ -1,5 +1,9 @@
 # Chorey
 
+<p align="center">
+  <img src="docs/screenshots/dashboard-dark.png" alt="Chorey management interface — chores, reward rules, and weekly history" width="820">
+</p>
+
 A self-hosted, single-purpose star-chart chore tracker for a household. It has
 two distinct surfaces:
 
@@ -19,19 +23,60 @@ again once the current period rolls over. Both surfaces show a Monday–Sunday
 day strip for the current week and a summary of the last 4 completed weeks
 (total stars and whether the reward threshold was hit).
 
+The whole app has both a light and a dark theme, switchable from a toggle in
+the top-right corner — dark is the default.
+
 See **[DESIGN.md](DESIGN.md)** for the full design reference: data model,
 business logic (period keys, week math, the weekly-history algorithm), the API
 reference, and the frontend component contracts.
+
+## Screenshots
+
+**Sign-in — "Who's managing?"**, in both themes:
+
+<p align="center">
+  <img src="docs/screenshots/login-dark.png" alt="Sign-in screen, dark theme" width="49%">
+  <img src="docs/screenshots/login-light.png" alt="Sign-in screen, light theme" width="49%">
+</p>
+
+**Getting started** — the empty-state hero shown before any Child profile exists:
+
+<p align="center">
+  <img src="docs/screenshots/empty-state-dark.png" alt="Empty state prompting to add the first child" width="820">
+</p>
+
+**Management interface** — chores, reward rules with expandable weekly
+history, and Child Portal links:
+
+<p align="center">
+  <img src="docs/screenshots/dashboard-dark.png" alt="Management dashboard with chores, reward rules, and history" width="820">
+</p>
+
+**Child Portal** — the no-login view a kid taps through on a shared tablet,
+with today/this-week progress, a 7-day strip, and reward status:
+
+<p align="center">
+  <img src="docs/screenshots/portal-light.png" alt="Child Portal checklist, light theme" width="49%">
+  <img src="docs/screenshots/portal-dark.png" alt="Child Portal checklist, dark theme" width="49%">
+</p>
+
+**Users** — profile management, passkeys, and importing a `chore-export.json`
+from a previous version:
+
+<p align="center">
+  <img src="docs/screenshots/users-dark.png" alt="Users page with passkey management and import" width="820">
+</p>
 
 ## Tech stack
 
 - **Backend**: Node.js + TypeScript, Express 4, `better-sqlite3` (WAL mode),
   `zod`, `bcryptjs`, `@simplewebauthn/server` (passkeys), `nanoid`,
-  `cookie-parser`.
+  `cookie-parser`, `express-rate-limit`.
 - **Frontend**: React 18 + Vite + TypeScript, `react-router-dom` v6,
-  Tailwind CSS v3.
+  Tailwind CSS v3 (class-based dark mode).
 - **Packaging**: a single Docker image — Express serves the built React bundle
-  as static files and the API from the same origin.
+  as static files and the API from the same origin, running as a non-root
+  user.
 
 ## Run with Docker
 
@@ -56,7 +101,7 @@ Copy `.env.example` to `.env` (next to `docker-compose.yml`) and adjust:
 | `PORT`           | `5152`                    | Port the server listens on (and the published container port).|
 | `SESSION_SECRET` | `change-me-in-production` | **Set a real one** — e.g. `openssl rand -hex 32`.             |
 | `RP_ID`          | `localhost`               | WebAuthn relying-party ID (a hostname, no scheme/port).       |
-| `RP_NAME`        | `Chorey`           | Name shown in the passkey prompt.                             |
+| `RP_NAME`        | `Chorey`                  | Name shown in the passkey prompt.                             |
 | `ORIGIN`         | `http://localhost:5152`   | Must match the URL the browser hits, for WebAuthn.            |
 
 **Passkeys** only work in a secure context — `https` on a real domain, or
