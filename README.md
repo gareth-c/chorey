@@ -4,8 +4,33 @@
   <img src="docs/screenshots/dashboard-dark.png" alt="Chorey management interface — chores, reward rules, and weekly history" width="820">
 </p>
 
-A self-hosted, single-purpose star-chart chore tracker for a household. It has
-two distinct surfaces:
+<p align="center"><strong>Turn chores into a star chart your kids actually want to check.</strong></p>
+
+Chorey is a self-hosted, single-purpose chore tracker for a household — no
+accounts to create, no ads, no subscription, nobody's server holding your
+kids' data. Parents run everything from a clean dashboard; kids get their own
+no-login link on a shared tablet where tapping a finished chore is the whole
+interaction. It's the kind of tool you set up once on a spare Raspberry Pi or
+NAS and forget about — until the star chart becomes the thing your kids ask
+to check before breakfast.
+
+A few reasons it's worth the five minutes to try:
+
+- **Nothing to explain.** Two screens, no per-kid accounts, no settings maze
+  — one `docker compose up` and a setup wizard, and you have a working star
+  chart (see below).
+- **Built for the shared tablet, not around it.** The Child Portal is
+  passkey-secured for parent sign-in, so a password never has to be typed on
+  a screen the kids have all day.
+- **Doesn't guess your history.** Weekly rewards are graded against the goal
+  that was actually in effect that week, in your actual timezone — raise the
+  bar today without quietly rewriting last week.
+- **It's genuinely nice to look at.** Light and dark themes, both designed
+  on purpose (screenshots below), not just default browser styling.
+- **Your data stays yours.** One SQLite file, one Docker container, no
+  third-party service in the loop.
+
+It has two distinct surfaces:
 
 - **Management interface** (`/app`) — Parent-only. Sign in, create chores
   (name, assignee, frequency, star value), delete them, manage Parent/Child
