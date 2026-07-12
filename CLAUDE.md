@@ -33,6 +33,41 @@ port; in dev, Vite proxies `/api` to the server (`client/vite.config.ts`).
 - WebAuthn `ORIGIN`/`RP_ID` must match the URL the browser actually hits, or
   passkey registration/login fails. Passkeys need a secure context
   (`https`, or `http://localhost`).
+- Sessions are opaque `nanoid(32)` tokens in an httpOnly cookie, looked up
+  against the `sessions` table (30-day TTL) — not signed JWTs. `SESSION_SECRET`
+  is unused for this reason; it's kept only as a placeholder.
+- Since only Parents ever get a session, `req.user.role` is always `"parent"`
+  wherever `requireAuth` has run. `requireRole("parent")` on write routes is
+  defense in depth, not currently load-bearing — don't remove it on the
+  assumption it's dead code.
+- A logged-in Parent can register/remove a passkey for *any* Parent profile,
+  including their own, via `/api/users/:id/passkey/*`. Attempting this against
+  a Child profile 400s — enforced server-side in `requireParentTarget()`
+  (`users.routes.ts`), not just by the UI hiding the buttons.
+- `/api/auth/login` and `/api/auth/login/passkey/verify` are rate-limited
+  (`express-rate-limit`, 10 attempts / 15 min per IP) — a deliberate fix for
+  an online brute-force gap, don't strip it out when touching those routes.
+
+## Chore business logic (don't break these invariants)
+
+- **Period keys** (`chores/service.ts`'s `computePeriodKey`) govern only
+  re-completion eligibility — `chore_completions` has
+  `UNIQUE(chore_id, period_key)`, which is what makes "tap to complete"
+  idempotent per day/week/month. They do **not** drive historical reporting;
+  `sumStars()` sums by `completed_at` timestamp range instead. Don't conflate
+  the two when changing either.
+- **Weeks start Monday, end Sunday, all in UTC** — no per-user timezone
+  support. Deliberate simplification, not an oversight.
+- **`weekly_threshold` is not stored per week** — every `WeekSummary`,
+  including past ones, uses *today's* `reward_rules.daily_star_goal * 7`.
+  Changing a child's daily goal retroactively changes what past weeks show as
+  "earned." Fixing this would mean storing a threshold snapshot per week — a
+  real schema change, not a bug fix.
+- `PAST_WEEKS_SHOWN = 4` in `chores/service.ts` is the only thing controlling
+  how many past weeks render; trivial to change, currently not configurable.
+- `POST /api/import` (a `chore-export.json` from a previous version) always
+  creates fresh children/chores rather than merging by name — importing the
+  same file twice produces duplicates, intentionally.
 
 ## Conventions
 

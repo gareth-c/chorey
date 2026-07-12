@@ -1,15 +1,9 @@
-# Chorey — standalone extraction design doc
+# Chorey — design reference
 
-This document plus the `source/` folder next to it are a self-contained
-handoff package: everything a fresh Claude Code session (in a **new, empty
-repo**) needs to stand up Chorey as its own small app, without access
-to the Homey monorepo it was extracted from.
-
-Read this doc first, then use `source/` as the literal starting file tree —
-it's not pseudocode, it's real TypeScript/SQL adapted to drop the
-Homey-specific plumbing (plugin registry, multi-plugin nav shell, backup
-system) while keeping every piece of Chorey's own logic byte-for-byte
-identical to what's running in production today.
+The full design reference for Chorey: data model, business logic, API
+reference, and frontend component contracts. See [README.md](README.md) for
+what the app does and how to run it, and [CLAUDE.md](CLAUDE.md) for
+conventions and invariants to keep in mind while working in the codebase.
 
 ## 1. What this app does
 
@@ -41,53 +35,20 @@ themselves in the Portal) can see:
 - a **previous-weeks summary**: the last 4 completed weeks (each ending
   Sunday), total stars, and whether the reward threshold was hit
 
-## 2. Scope: what's carried over vs. dropped
-
-This app needs *some* multi-user concept — chores are assigned to specific
-children, and only parents can manage them — so full auth isn't optional.
-Passkey support is *in scope* here (unlike a first pass at this extraction,
-which dropped it) specifically because of the Child Portal's parent-picker:
-a shared, kid-accessible screen is exactly the situation passkeys are good
-at securing, better than a password that can be shoulder-surfed. Everything
-else Homey-specific is still left behind.
-
-**Carried over (verbatim or near-verbatim):**
-- `users` table (parent/child roles) + session auth, **with password and
-  WebAuthn/passkey support restricted to Parent profiles** — Child profiles
-  have no credentials at all; they're reached only via their portal token
-  (see §5.1)
-- All of Chorey's own logic: schema, service functions, routes,
-  portal routes, every React component
-- The visual language: Tailwind + the same `brand` color scale and
-  `.input`/`.btn-primary`/`.btn-secondary`/`.btn-danger` utility classes,
-  so it looks like a sibling app, not a fork with a different skin
-
-**Dropped (not needed for a single-purpose app):**
-- The plugin registry (`server/src/plugins/registry.ts`,
-  `config/plugins.json`, the enabled/disabled toggle system) — Chore
-  Tracker's routes are mounted directly instead of dynamically discovered
-- Backup & Restore (scheduled zip backups, restore-on-blank-install) — out
-  of scope for v1. A single SQLite file is easy to back up by just copying
-  it; revisit if this app grows enough to warrant it
-- House Details, Bill Manager, Policy Tracker, and the multi-plugin sidebar
-  shell (`AppShell.tsx`) — this app has exactly two screens (management
-  interface, Child Portal), so it doesn't need a plugin nav at all
-
-## 3. Tech stack
-
-Same as Homey, because Chorey's code was written against it and
-there's no reason to introduce risk translating to something else:
+## 2. Tech stack
 
 - **Backend**: Node.js + TypeScript, Express 4, `better-sqlite3` (synchronous
   SQLite, WAL mode), `zod` for request validation, `bcryptjs` for password
   hashing, `@simplewebauthn/server` for passkeys, `nanoid` for IDs and
-  tokens, `cookie-parser` for session cookies
+  tokens, `cookie-parser` for session cookies, `express-rate-limit` on the
+  login endpoints
 - **Frontend**: React 18 + Vite + TypeScript, `react-router-dom` v6, Tailwind
-  CSS v3
-- **Packaging**: single Docker image (Express serves the built React bundle
-  as static files + the API from the same origin, same as Homey) — see §8
+  CSS v3 (class-based dark mode, light theme as the opt-in alternative)
+- **Packaging**: single Docker image — Express serves the built React bundle
+  as static files plus the API from the same origin, running as a non-root
+  user (see §8)
 
-## 4. Data model
+## 3. Data model
 
 ```sql
 -- users: the only "who can do what" concept this app needs. Child rows
@@ -109,7 +70,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at TEXT NOT NULL
 );
 
--- Passkeys — Parent profiles only (see §5.1).
+-- Passkeys — Parent profiles only (see §4.1).
 CREATE TABLE IF NOT EXISTS webauthn_credentials (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -127,7 +88,6 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Chorey's own tables — unchanged from Homey.
 CREATE TABLE IF NOT EXISTS chores (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -161,25 +121,24 @@ CREATE TABLE IF NOT EXISTS portal_links (
 );
 ```
 
-Split across `source/server/src/db/migrations/0001_init.sql` (users +
-sessions), `0002_chore_tracker.sql` (chores/completions/reward
-rules/portal links), and `0003_webauthn.sql` (the two passkey tables above),
-applied by a tiny numbered-migration runner (`db/migrate.ts`) — same pattern
-as Homey, copied as-is since it's fully generic.
+Split across `server/src/db/migrations/0001_init.sql` (users + sessions),
+`0002_chore_tracker.sql` (chores/completions/reward rules/portal links), and
+`0003_webauthn.sql` (the two passkey tables above), applied by a tiny
+numbered-migration runner (`db/migrate.ts`).
 
-**Important nuance carried over as-is**: `weekly_threshold` isn't stored per
-week — it's always `reward_rules.daily_star_goal × 7`, the *current* rule.
-Historical week summaries (§6) apply today's threshold retroactively rather
-than whatever the goal was at the time. This matches Homey's behavior and is
-a deliberate simplification, not an oversight — worth flagging if a future
-session wants to "fix" it, since doing so would mean storing a threshold
-snapshot per week, which is a real (if small) schema change.
+**Important nuance**: `weekly_threshold` isn't stored per week — it's always
+`reward_rules.daily_star_goal × 7`, the *current* rule. Historical week
+summaries (§4.2) apply today's threshold retroactively rather than whatever
+the goal was at the time. This is a deliberate simplification, not an
+oversight — fixing it would mean storing a threshold snapshot per week, which
+is a real (if small) schema change.
 
-## 5. Backend architecture
+## 4. Backend architecture
 
 ```
 server/src/
   env.ts                    # port, data dir, session secret, RP_ID/RP_NAME (passkeys), origin
+  version.ts                 # reads version.json once at startup, exposed at GET /api/version
   db/
     client.ts                # better-sqlite3 connection, WAL mode
     migrate.ts                # runs migrations/*.sql once, tracked in _migrations
@@ -201,6 +160,7 @@ server/src/
     auth.routes.ts               # Parent profiles list, setup (first parent), login (password + passkey), logout
     users.routes.ts               # parent-only: create/edit/delete users, set/clear password, register/remove passkeys
     portal.routes.ts               # PUBLIC, no requireAuth — token-authenticated Child Portal
+    import.routes.ts                # parent-only: import a chore-export.json from a previous version
   chores/
     service.ts                     # all business logic (below) — pure, no Express types
     routes.ts                       # thin Express layer over service.ts
@@ -208,7 +168,7 @@ server/src/
   index.ts                            # runs migrations, starts the HTTP server
 ```
 
-### 5.1 Auth model
+### 4.1 Auth model
 
 Two things make this different from a typical single-login app: only
 Parents ever get a session, and Parents can authenticate with a password,
@@ -217,7 +177,7 @@ a passkey, or both.
 - `GET /api/auth/profiles` → `{ needsSetup, profiles: [{id, name, avatarEmoji, role, hasPassword, hasPasskey}] }`,
   **filtered to `role = 'parent'`** — this is the list the management
   interface's login picker (and the Child Portal's embedded parent picker,
-  see §6.3) renders. `needsSetup` is true iff `users` is empty (checked
+  see §5.3) renders. `needsSetup` is true iff `users` is empty (checked
   unfiltered — the very first user created is always a Parent, via
   `/setup`) — the client shows a "create the first Parent" form instead of
   a profile picker in that case.
@@ -226,15 +186,18 @@ a passkey, or both.
 - `POST /api/auth/login` with `{userId, password?}` → `userId` must resolve
   to a Parent (child IDs 404). If the profile has no `password_hash`,
   `password` is ignored and login succeeds outright; if it does, `password`
-  must match.
+  must match. Rate-limited (`express-rate-limit`) to 10 attempts per 15
+  minutes per IP.
 - `POST /api/auth/login/passkey/options` with `{userId}` → generates a
   WebAuthn authentication challenge for that Parent (400 if they have no
   registered passkey). `POST /api/auth/login/passkey/verify` with
   `{userId, response}` → verifies the browser's assertion and, on success,
-  creates a session exactly like the password path.
+  creates a session exactly like the password path. Also rate-limited.
 - `POST /api/auth/logout`, `GET /api/auth/session` → `{user: SessionUser | null}`.
 - Session = a `nanoid(32)` token in an httpOnly cookie, looked up against the
-  `sessions` table (30-day TTL, same as Homey). `requireAuth` populates
+  `sessions` table (30-day TTL) — an opaque, DB-backed token, not a signed
+  JWT. `SESSION_SECRET` is unused for this reason; it's kept only as a
+  placeholder should cookie signing ever be added. `requireAuth` populates
   `req.user` from it; since only Parents ever reach this point,
   `req.user.role` is always `"parent"` for any authenticated request —
   `requireRole("parent")` is kept on the write routes anyway as defense in
@@ -255,16 +218,14 @@ the UI hiding the buttons.
 URL. If the Child Portal is opened over LAN IP on a shared tablet (the
 common case), the "Parent sign-in" picker's passkey button won't be usable
 there even though the tablet *can* see it; password login still works.
-Put this app behind a reverse proxy with HTTPS (see §8) to get passkeys
+Put this app behind a reverse proxy with HTTPS (see §7) to get passkeys
 working from every device, not just `localhost`.
 
-### 5.2 Chore business logic (`chores/service.ts`)
+### 4.2 Chore business logic (`chores/service.ts`)
 
 This is the part worth reading closely — it's the one file with real logic,
 everything else is CRUD plumbing. All dates are handled in **UTC**
-throughout (no per-user timezone support — a deliberate simplification
-carried over from Homey; a future session could add a `timezone` column on
-`users` and thread it through if that ever matters).
+throughout — no per-user timezone support, a deliberate simplification.
 
 **Period keys** — what makes the "can't complete a chore twice in the same
 period" rule work:
@@ -297,7 +258,7 @@ function getWeekStart(d: Date): Date {
 
 So a week always runs Monday 00:00 UTC through the following Monday 00:00
 UTC (exclusive) — i.e. it **ends on Sunday**, which is what the weekly
-history feature (§2, most recently added to Homey) depends on.
+history feature (§1) depends on.
 
 **Weekly history** — the day-strip + previous-weeks summary:
 
@@ -313,7 +274,7 @@ export interface WeekSummary {
   weekStart: string;  // Monday, 'YYYY-MM-DD'
   weekEnd: string;    // Sunday, 'YYYY-MM-DD'
   stars: number;
-  threshold: number;         // today's reward_rules.daily_star_goal * 7 (see the nuance in §4)
+  threshold: number;         // today's reward_rules.daily_star_goal * 7 (see the nuance in §3)
   rewardEarned: boolean;
   isCurrent: boolean;
   days: DayStars[];   // always 7 entries, Monday first
@@ -358,30 +319,32 @@ function computeWeeklyHistory(userId: string, weeklyThreshold: number): WeekSumm
 `chore_completions` to `chores` and summing `stars` for completions in
 `[start, end)` — this is what actually answers "how many stars on this day /
 in this week," independent of `period_key` (which only governs re-completion
-eligibility, not historical reporting).
+eligibility, not historical reporting). `PAST_WEEKS_SHOWN` is a plain
+constant in `chores/service.ts`, not configurable via the UI or env.
 
-`computeProgress(userId)` (the existing "today / this week" tracker) now
-also calls `computeWeeklyHistory` and returns it as a `weeks` field — so
-every place that already returned `Progress` (reward-rules endpoint, the
-toggle endpoint, the portal endpoint) picked up the weekly history for free,
-no new routes needed. Worth preserving that pattern in the standalone app
-rather than adding a parallel `/history` endpoint.
+`computeProgress(userId)` (the "today / this week" tracker) also calls
+`computeWeeklyHistory` and returns it as a `weeks` field — so every place
+that already returns `Progress` (reward-rules endpoint, the toggle endpoint,
+the portal endpoint) gets the weekly history for free, no separate
+`/history` endpoint needed. Worth preserving that pattern for any future
+progress-related addition rather than adding a parallel endpoint.
 
-### 5.3 API reference
+### 4.3 API reference
 
 All `/api/chores/*` and `/api/users/*` routes require a valid session
 (`requireAuth` is applied once, at the router mount point, not per-route) —
-and since only Parents ever get a session (§5.1), "parent" and "session" are
+and since only Parents ever get a session (§4.1), "parent" and "session" are
 effectively the same precondition throughout this app. `/api/portal/*`
 routes are deliberately public — the token in the URL *is* the credential.
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
+| GET | `/api/version` | none | `{year, month, build, label}` — baked in at Docker build time |
 | GET | `/api/auth/profiles` | none | Parent profiles only |
 | POST | `/api/auth/setup` | none, but 409 once `users` is non-empty | creates first Parent |
-| POST | `/api/auth/login` | none | `{userId, password?}`, `userId` must be a Parent |
+| POST | `/api/auth/login` | none, rate-limited | `{userId, password?}`, `userId` must be a Parent |
 | POST | `/api/auth/login/passkey/options` | none | `{userId}` → WebAuthn authentication challenge |
-| POST | `/api/auth/login/passkey/verify` | none | `{userId, response}` → creates session on success |
+| POST | `/api/auth/login/passkey/verify` | none, rate-limited | `{userId, response}` → creates session on success |
 | POST | `/api/auth/logout` | session | |
 | GET | `/api/auth/session` | none | `{user: SessionUser \| null}` |
 | GET | `/api/users` | parent | list all profiles (Parent + Child) |
@@ -402,6 +365,7 @@ routes are deliberately public — the token in the URL *is* the credential.
 | PUT | `/api/chores/reward-rules/:userId` | parent | `{dailyStarGoal, weeklyReward}` |
 | GET | `/api/chores/links` | parent | each child's Child Portal URL (or null if never generated) |
 | POST | `/api/chores/links/:userId/regenerate` | parent | invalidates the old URL |
+| POST | `/api/import` | parent | body is a `chore-export.json` payload — creates children, reward rules, portal links, chores, and completions as fresh copies |
 | GET | `/api/portal/:token` | **none** | `{child, chores, progress}` — 404 on bad/revoked token |
 | POST | `/api/portal/:token/chores/:choreId/toggle` | **none** | 403 if the chore isn't assigned to that token's user |
 
@@ -416,35 +380,41 @@ interface Progress {
   weeklyThreshold: number;
   weeklyReward: string;
   rewardEarned: boolean;
-  weeks: WeekSummary[]; // see §5.2 — weeks[0] is the current week
+  weeks: WeekSummary[]; // see §4.2 — weeks[0] is the current week
 }
 ```
 
-## 6. Frontend architecture
+## 5. Frontend architecture
 
 ```
 client/src/
-  main.tsx                    # BrowserRouter + AuthProvider + <App/>
+  main.tsx                    # BrowserRouter + ThemeProvider + AuthProvider + <App/>
   App.tsx                      # routes: /login, /app, /app/users, /portal/:token
-  index.css                     # Tailwind directives + .input/.btn-* component classes
+  index.css                     # Tailwind directives + .card/.input/.btn-* component classes
   api/
     client.ts                    # fetch wrapper (credentials: 'include'), typed api.get/post/put/delete
   context/
     AuthContext.tsx               # current user + refresh()/logout()
-    useAuth.ts                     # the hook (split out for Fast Refresh, same as Homey)
+    useAuth.ts                     # the hook (split out for Fast Refresh)
+    ThemeContext.tsx                # light/dark theme state, persisted to localStorage
+    useTheme.ts                      # the hook (same Fast-Refresh reason as useAuth.ts)
   components/
     ProfileCard.tsx                # one tile in the profile picker
+    AppBackground.tsx               # fixed gradient + glow-blob backdrop, shared across every screen
+    ThemeToggle.tsx                  # fixed top-right light/dark switch
+    VersionBadge.tsx                  # fixed bottom-right build label, reads GET /api/version
   pages/
     ProfilePicker.tsx               # Parent login screen — password and/or passkey. Reused, embedded,
-                                      # as the Child Portal's "parental user picker" (see §6.3); an
+                                      # as the Child Portal's "parental user picker" (see §5.3); an
                                       # optional `onCancel` prop renders a "← Back" link in that context.
     SetupWizard.tsx                  # first-run: create the first Parent
     Dashboard.tsx                     # the management interface — Parent-only, no role branch needed
     Users.tsx                          # the management interface's user admin: create/delete Parent +
-                                         # Child profiles, set passwords, register/remove passkeys
+                                         # Child profiles, set passwords, register/remove passkeys, import
+                                         # a chore-export.json from a previous version
     ChildPortal.tsx                     # standalone, token-authenticated — NOT under AuthContext for
                                           # its data fetching, but mounts <ProfilePicker> as a takeover
-                                          # overlay when "Parent sign-in" is tapped (see §6.3)
+                                          # overlay when "Parent sign-in" is tapped (see §5.3)
   chores/
     ChoreChecklist.tsx                 # presentational: a child's chores + progress. Used by
                                          # ChildPortal.tsx — the Portal always matches what a parent
@@ -454,7 +424,7 @@ client/src/
                                          # (behind a "Show history" toggle per child).
 ```
 
-### 6.1 Component contracts
+### 5.1 Component contracts
 
 `ChoreChecklist` (`client/src/chores/ChoreChecklist.tsx`) — the shared
 child-facing view:
@@ -491,9 +461,9 @@ fetch logic into a public page.
 2. `weeks.slice(1)` as a list of past-week rows: date range, total stars vs.
    threshold, and a 🎉 marker when `rewardEarned`.
 
-### 6.2 Auth flow
+### 5.2 Auth flow
 
-`ProfilePicker` fetches `/auth/profiles` (Parent-only, per §5.1). If
+`ProfilePicker` fetches `/auth/profiles` (Parent-only, per §4.1). If
 `needsSetup`, it renders `SetupWizard` instead. Otherwise it shows a grid of
 `ProfileCard`s; clicking one with neither a password nor a passkey logs in
 immediately, clicking one with either reveals an inline panel: a "Use
@@ -501,7 +471,7 @@ passkey" button (only shown if `hasPasskey` and the browser supports
 WebAuthn) and/or a password form (only shown if `hasPassword`). On success,
 `AuthContext.refresh()` is called and the router navigates to `/app`.
 
-`App.tsx` (trimmed from Homey's multi-plugin version):
+`App.tsx`:
 
 ```tsx
 export default function App() {
@@ -527,7 +497,7 @@ reward rules (with a per-child "Show history" toggle rendering
 `WeeklyHistory`), and Child Portal links, plus a "Manage users" link to
 `Users.tsx`. No role branch — every session here is a Parent.
 
-### 6.3 Child Portal flow
+### 5.3 Child Portal flow
 
 `ChildPortal.tsx` reads `:token` from the URL, calls `GET /api/portal/:token`
 (no cookie needed — the fetch wrapper always sends `credentials: 'include'`
@@ -548,11 +518,11 @@ within the app's single `<AuthProvider>`/`<BrowserRouter>` tree, just
 rendered on top of the portal instead of routed to. `onCancel` closes the
 overlay and returns to the child's checklist without signing in anywhere.
 
-## 7. Styling system
+## 6. Styling system
 
-Tailwind v3, with one custom color scale (`brand`, a blue) and four
-component classes layered in `index.css`, reused verbatim so the standalone
-app matches Homey's look without redesigning anything:
+Tailwind v3, class-based dark mode (`darkMode: "class"`, toggled via a `dark`
+class on `<html>`), with one custom color scale (`brand`, a blue), two custom
+animations (`blob`, `twinkle`), and component classes layered in `index.css`:
 
 ```js
 // tailwind.config.js — theme.extend.colors.brand
@@ -561,108 +531,82 @@ app matches Homey's look without redesigning anything:
 ```
 
 ```css
-/* index.css @layer components */
-.input          /* rounded border input, brand-colored focus ring */
-.btn-primary    /* solid brand-600 button */
-.btn-secondary  /* white button, slate border */
+/* index.css @layer components — each has a light base + dark: variant */
+.card           /* glass panel: white card in light, translucent blurred panel in dark */
+.input          /* bordered input, amber focus ring */
+.btn-primary    /* amber gradient button — the app's one theme-agnostic accent color */
+.btn-secondary  /* bordered button, light/dark background pair */
 .btn-danger     /* small red-text button, used for delete actions */
 ```
 
-Full file is in `source/client/src/index.css` — copy it as-is.
+Dark is the default theme (`ThemeContext`, persisted to `localStorage`); an
+inline script in `index.html` applies the saved theme before first paint to
+avoid a flash of the wrong theme. Gold/amber is used consistently as the
+"stars" accent color across both themes — reward text, progress bars, and the
+primary CTA all share it rather than using the blue `brand` scale, which is
+reserved for selection/focus states.
 
-## 8. Infra
+## 7. Infra
 
-**Ports & env vars** (see `source/server/src/env.ts`):
+**Ports & env vars** (see `server/src/env.ts`):
 
 | Var | Default | Notes |
 |---|---|---|
-| `PORT` | `4100` | picked to not collide with Homey's `5052` if run side-by-side during development |
+| `PORT` | `5152` | the port the server listens on |
 | `DATA_DIR` | `./data` | where `chores.db` (+ WAL/SHM) lives |
-| `SESSION_SECRET` | insecure dev default | not actually used for cookie signing today (sessions are opaque DB-backed tokens, not signed JWTs) — kept for parity with Homey and as a placeholder if that ever changes |
-| `RP_ID` | `localhost` | WebAuthn Relying Party ID — must match the domain the app is served from for passkeys to work; see the secure-context caveat in §5.1 |
+| `SESSION_SECRET` | insecure dev default | not actually used for cookie signing today (sessions are opaque DB-backed tokens, not signed JWTs) — kept as a placeholder if that ever changes |
+| `RP_ID` | `localhost` | WebAuthn Relying Party ID — must match the domain the app is served from for passkeys to work; see the secure-context caveat in §4.1 |
 | `RP_NAME` | `Chorey` | display name shown by the OS passkey prompt during registration |
-| `ORIGIN` | `http://localhost:4100` | used to build the Child Portal URL returned by `/api/chores/links`, and must match the origin WebAuthn ceremonies are verified against |
+| `ORIGIN` | `http://localhost:5152` | used to build the Child Portal URL returned by `/api/chores/links`, and must match the origin WebAuthn ceremonies are verified against |
 
-**Docker**: same multi-stage pattern as Homey — build the Vite client,
-build the TS server, copy both plus `node_modules` (prod only) into a
-`node:20-alpine` runtime image, serve the client build as static files from
-the same Express process that serves the API. `data/` is a bind-mounted
-volume so the SQLite file survives container restarts/rebuilds.
+**Docker**: multi-stage build — build the Vite client, build the TS server,
+copy both plus `node_modules` (prod only) and `version.json` into a
+`node:20-alpine` runtime image. The container runs as the unprivileged
+`node` user; an entrypoint script fixes ownership of the (often
+root-owned, bind-mounted) `data/` directory before dropping privileges, so
+this works on a fresh Linux host as well as locally. `data/` is a
+bind-mounted volume so the SQLite file survives container restarts/rebuilds.
 
 ```yaml
 # docker-compose.yml
 services:
   chorey:
     build: .
-    ports: ["4100:4100"]
+    ports: ["5152:5152"]
     volumes:
       - ./data:/app/data
     environment:
       - SESSION_SECRET=${SESSION_SECRET:-change-me-in-production}
       - RP_ID=${RP_ID:-localhost}
-      - ORIGIN=${ORIGIN:-http://localhost:4100}
+      - ORIGIN=${ORIGIN:-http://localhost:5152}
     restart: unless-stopped
 ```
 
 Passkeys need a real HTTPS origin (or `localhost`) to work at all — see the
-secure-context caveat in §5.1. Put a reverse proxy (Caddy, Traefik, Nginx +
+secure-context caveat in §4.1. Put a reverse proxy (Caddy, Traefik, Nginx +
 Let's Encrypt) in front of this for production if you want the Child
 Portal's "Parent sign-in" passkey option to work from devices other than
 `localhost`; set `RP_ID`/`ORIGIN` to match that domain.
 
-## 9. Bootstrapping the new repo
+`.github/workflows/docker-build.yml` builds and, on pushes to `main`, pushes
+the image to GHCR — see the "Build versioning" section of
+[CLAUDE.md](CLAUDE.md) for how that ties into `version.json`.
 
-1. `mkdir chorey && cd chorey && git init`
-2. Copy `source/server/` → `./server/`, `source/client/` → `./client/`
-   verbatim — every file in there is meant to be used as-is, not as a
-   reference to retype.
-3. `cd server && npm install` (this pulls in the `better-sqlite3` native
-   build — same Node 20 requirement as Homey; use `--ignore-scripts` for a
-   quick local typecheck if the native compile is inconvenient on your
-   machine, and let Docker's `node:20-alpine` stage do the real build).
-4. `cd ../client && npm install`
-5. Add `Dockerfile` + `docker-compose.yml` (§8) and a root `package.json`
-   with `lint`/`format` scripts if you want the same ESLint + Prettier setup
-   Homey uses — not copied here since it's generic tooling config, not part
-   of Chorey's logic. Fastest path: copy `eslint.config.js` from
-   Homey's `server/` and `client/` folders and `.prettierrc.json` from the
-   repo root, unchanged.
-6. `npm run dev` in both `server/` and `client/` (client proxies `/api` to
-   `http://localhost:4100`, same as Homey's `vite.config.ts` — copied as-is
-   in `source/client/vite.config.ts`).
-7. Visit the client dev URL, walk through `SetupWizard` to create the first
-   Parent, then go to Manage users to add a Child. Add a chore, generate a
-   Child Portal link, and open it in a fresh browser context (no cookies) —
-   confirm it loads that child's chores with no login, tapping toggles them,
-   and the weekly history renders correctly there and in Dashboard's
-   per-child "Show history" view.
-8. From the Child Portal, tap "Parent sign-in," confirm the picker only
-   lists Parent profiles, and confirm a password login there lands you back
-   in the management interface at `/app`. Register a passkey for the Parent
-   from Manage users, then repeat this from a fresh browser context using
-   "Use passkey" instead — note this only works over `https://` or
-   `http://localhost` (§5.1).
-9. Confirm a Child profile can't be given a password or passkey — both the
-   Add-profile form (password field hidden for role: child) and the API
-   (`POST /users` 400s if `password` is set with `role: "child"`) should
-   refuse it.
+## 8. Known limitations and open questions
 
-## 10. Open decisions for the next session
-
-These are genuine judgment calls, not things I already decided on your
-behalf — flagging them explicitly rather than burying a choice in code:
+Genuine judgment calls and deliberate simplifications, not oversights —
+worth knowing about before "fixing" any of them:
 
 - **Password vs. passkey on the Child Portal's parent picker**: both are
   currently offered there, same as at `/login` — `ProfilePicker` doesn't
   distinguish where it's rendered. If a family wants the shared-device
   picker to be *stricter* than the direct-device one (e.g. passkey-only, no
   password fallback, since a password is more exposed on a kid-accessible
-  screen), that's a real tightening to make deliberately, not something
-  assumed here — it'd mean passing a flag into `ProfilePicker` to hide the
-  password form when `onCancel` is set (i.e. when it's being used as the
-  portal's embedded picker).
+  screen), that's a real, unmade tightening — it'd mean passing a flag into
+  `ProfilePicker` to hide the password form when `onCancel` is set (i.e.
+  when it's being used as the portal's embedded picker).
 - **Historical reward thresholds**: `WeekSummary.threshold` always reflects
-  *today's* reward rule, not what it was when that week happened (§4). Fine
+  *today's* reward rule, not what it was when that week happened (§3). Fine
   for a family that rarely changes the goal; worth storing a snapshot if
   that assumption stops holding.
 - **Timezone**: everything is UTC day/week boundaries. A family that cares
@@ -670,3 +614,8 @@ behalf — flagging them explicitly rather than burying a choice in code:
   `timezone` column on `users` threaded through `service.ts`'s date math.
 - **How many past weeks to show**: hardcoded to 4 (`PAST_WEEKS_SHOWN` in
   `chores/service.ts`). Trivial to make configurable if useful.
+- **Re-importing via `/api/import` creates fresh copies, not a merge**: two
+  imports of the same export produce duplicate children/chores rather than
+  deduplicating by name. Intentional — a silent merge felt more surprising
+  than a duplicate you can delete — but worth knowing before relying on it
+  for repeated imports.
