@@ -13,6 +13,12 @@ import SetupWizard from "./SetupWizard";
  * Portal to switch into management mode on a shared device — pass
  * `onCancel` in that context so there's a way back to the child's checklist
  * without signing in.
+ *
+ * When `onCancel` is set (i.e. this is the portal's embedded picker), only
+ * passkey sign-in is offered — no password form, and no credential-less
+ * auto-login. A password typed on a screen a child has physical access to
+ * can be watched or guessed; a passkey can't. At `/login` (no `onCancel`)
+ * both remain available, same as before.
  */
 export default function ProfilePicker({ onCancel }: { onCancel?: () => void }) {
   const [profiles, setProfiles] = useState<Profile[] | null>(null);
@@ -23,6 +29,8 @@ export default function ProfilePicker({ onCancel }: { onCancel?: () => void }) {
   const [busy, setBusy] = useState(false);
   const { refresh } = useAuth();
   const navigate = useNavigate();
+  const isPortalPicker = !!onCancel;
+  const canUsePasskey = !!selected?.hasPasskey && browserSupportsWebAuthn();
 
   async function load() {
     const { profiles, needsSetup } = await api.get<{ profiles: Profile[]; needsSetup: boolean }>(
@@ -43,7 +51,9 @@ export default function ProfilePicker({ onCancel }: { onCancel?: () => void }) {
 
   async function handleSelect(profile: Profile) {
     setError(null);
-    if (!profile.hasPassword && !profile.hasPasskey) {
+    // A credential-less profile normally logs in with one tap — but not from
+    // the portal's embedded picker, where a child could just tap it too.
+    if (!isPortalPicker && !profile.hasPassword && !profile.hasPasskey) {
       setBusy(true);
       try {
         await api.post("/auth/login", { userId: profile.id });
@@ -108,7 +118,9 @@ export default function ProfilePicker({ onCancel }: { onCancel?: () => void }) {
       <div className="text-center">
         <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">Who's managing?</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Sign in to open the management interface.
+          {isPortalPicker
+            ? "Passkey sign-in only, for security on this shared device."
+            : "Sign in to open the management interface."}
         </p>
       </div>
 
@@ -129,7 +141,7 @@ export default function ProfilePicker({ onCancel }: { onCancel?: () => void }) {
             Sign in as {selected.name}
           </p>
 
-          {selected.hasPasskey && browserSupportsWebAuthn() && (
+          {canUsePasskey && (
             <button
               onClick={handlePasskeyLogin}
               disabled={busy}
@@ -139,20 +151,30 @@ export default function ProfilePicker({ onCancel }: { onCancel?: () => void }) {
             </button>
           )}
 
-          {selected.hasPassword && (
-            <form onSubmit={handlePasswordSubmit} className="space-y-3">
-              <input
-                autoFocus
-                type="password"
-                className="input"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <button type="submit" disabled={busy} className="btn-secondary w-full">
-                Sign in with password
-              </button>
-            </form>
+          {isPortalPicker ? (
+            !canUsePasskey && (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {selected.hasPasskey
+                  ? "This browser doesn't support passkeys. Try a different device, or sign in from the management interface on your own device."
+                  : "This parent hasn't set up a passkey yet. Add one from Manage users, or sign in from the management interface on your own device."}
+              </p>
+            )
+          ) : (
+            selected.hasPassword && (
+              <form onSubmit={handlePasswordSubmit} className="space-y-3">
+                <input
+                  autoFocus
+                  type="password"
+                  className="input"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button type="submit" disabled={busy} className="btn-secondary w-full">
+                  Sign in with password
+                </button>
+              </form>
+            )
           )}
 
           {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}

@@ -14,9 +14,10 @@ two distinct surfaces:
 - **Child Portal** (`/portal/:token`) — a no-login, per-child URL meant to
   live on a shared family tablet or a kid's phone. It shows only that child's
   chores; tapping one completes it immediately (no approval step). A small
-  "Parent sign-in" link reveals the Parent picker, which supports both
-  password and **passkey** login, so a parent can switch into the management
-  interface from the shared device.
+  "Parent sign-in" link reveals the Parent picker, restricted to **passkey**
+  login here (no password form, since it's a screen a child has physical
+  access to), so a parent can switch into the management interface from the
+  shared device.
 
 Each chore is **daily**, **weekly**, or **monthly** — it can only be completed
 again once the current period rolls over. Both surfaces show a Monday–Sunday
@@ -113,9 +114,11 @@ Copy `.env.example` to `.env` (next to `docker-compose.yml`) and adjust:
 
 **Passkeys** only work in a secure context — `https` on a real domain, or
 `http://localhost`. Over a plain `http://<lan-ip>:5152` URL (e.g. a shared
-tablet on the LAN) the passkey option is unusable there; the Parent picker
-still supports password login as a fallback. To use passkeys off-localhost,
-put the app behind HTTPS and set `RP_ID`/`ORIGIN` to that real hostname.
+tablet on the LAN), the Child Portal's embedded "Parent sign-in" picker is
+passkey-only, so it won't be usable there at all — sign in from `/login`
+directly on that device instead, which still supports a password. To use
+passkeys everywhere, including the shared-device picker, put the app behind
+HTTPS and set `RP_ID`/`ORIGIN` to that real hostname.
 
 ## Local development
 

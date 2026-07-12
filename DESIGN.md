@@ -22,9 +22,9 @@ surfaces** rather than one role-branching app:
   unobtrusive **"Parent sign-in"** link that reveals the same Parent picker
   used at `/login`, so a parent can switch into the management interface
   from the shared device itself rather than needing a second URL or device.
-  That picker supports both password and **passkey** login — passkeys are
-  the better fit for this specific spot, since it's a screen a child has
-  physical access to and a typed password can be watched or guessed.
+  In this embedded context that picker restricts sign-in to **passkey
+  only** — no password form — since it's a screen a child has physical
+  access to and a typed password can be watched or guessed.
 
 Each chore can be **daily**, **weekly**, or **monthly** — completing it
 again is only possible once the current period rolls over. Everyone (a
@@ -508,11 +508,24 @@ fetch logic into a public page.
 
 `ProfilePicker` fetches `/auth/profiles` (Parent-only, per §4.1). If
 `needsSetup`, it renders `SetupWizard` instead. Otherwise it shows a grid of
-`ProfileCard`s; clicking one with neither a password nor a passkey logs in
-immediately, clicking one with either reveals an inline panel: a "Use
-passkey" button (only shown if `hasPasskey` and the browser supports
-WebAuthn) and/or a password form (only shown if `hasPassword`). On success,
-`AuthContext.refresh()` is called and the router navigates to `/app`.
+`ProfileCard`s. What clicking one does depends on whether this is the
+`/login` route or the Child Portal's embedded picker (`isPortalPicker =
+!!onCancel`, since only the portal call site passes `onCancel`):
+
+- **At `/login`**: clicking a profile with neither a password nor a passkey
+  logs in immediately; clicking one with either reveals an inline panel — a
+  "Use passkey" button (only if `hasPasskey` and the browser supports
+  WebAuthn) and/or a password form (only if `hasPassword`).
+- **In the portal's embedded picker**: only passkey sign-in is offered.
+  There's no password form regardless of `hasPassword`, and no
+  credential-less auto-login either — a profile with no passkey (or a
+  passkey the current browser can't use) shows an explanatory message
+  instead of a way to sign in. This is deliberate: the picker renders on a
+  screen a child has physical, repeated access to, where a typed password
+  can be watched or a credential-less profile just tapped straight into.
+
+On success, `AuthContext.refresh()` is called and the router navigates to
+`/app`.
 
 `App.tsx`:
 
@@ -640,14 +653,6 @@ the image to GHCR — see the "Build versioning" section of
 Genuine judgment calls and deliberate simplifications, not oversights —
 worth knowing about before "fixing" any of them:
 
-- **Password vs. passkey on the Child Portal's parent picker**: both are
-  currently offered there, same as at `/login` — `ProfilePicker` doesn't
-  distinguish where it's rendered. If a family wants the shared-device
-  picker to be *stricter* than the direct-device one (e.g. passkey-only, no
-  password fallback, since a password is more exposed on a kid-accessible
-  screen), that's a real, unmade tightening — it'd mean passing a flag into
-  `ProfilePicker` to hide the password form when `onCancel` is set (i.e.
-  when it's being used as the portal's embedded picker).
 - **Timezone is household-level, not per-user**: `app_settings.timezone`
   applies to every child and parent alike. Fine for the app's actual usage
   model (one physical household), but a family split across timezones would
@@ -662,5 +667,8 @@ worth knowing about before "fixing" any of them:
 Resolved, previously listed here: historical reward thresholds now snapshot
 correctly (`reward_rule_history`, §3), day/week boundaries respect a
 configurable household timezone instead of hardcoded UTC (`chores/timezone.ts`),
-and the number of past weeks shown is a household setting instead of the
-`PAST_WEEKS_SHOWN` constant.
+the number of past weeks shown is a household setting instead of the
+`PAST_WEEKS_SHOWN` constant, and the Child Portal's embedded parent picker
+now offers passkey sign-in only — no password form, and no credential-less
+auto-login — since `ProfilePicker` distinguishes `onCancel`-rendered (portal)
+context from `/login` (see §5.2).

@@ -18,9 +18,10 @@ interface PortalData {
  * It also doubles as the on-device entry point into the management
  * interface: a "Parent sign-in" link reveals the same Parent picker used at
  * /login, so a parent doesn't need a separate URL to switch into management
- * mode on the shared device. That picker requires either a password or a
- * passkey — passkeys are the better fit here since the auth happens on a
- * screen a child has physical access to.
+ * mode on the shared device. Rendered here (with `onCancel` set), that
+ * picker restricts sign-in to passkey only — no password form, since the
+ * auth happens on a screen a child has physical access to (see
+ * ProfilePicker.tsx).
  */
 export default function ChildPortal() {
   const { token = "" } = useParams();

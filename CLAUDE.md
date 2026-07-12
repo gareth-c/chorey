@@ -47,6 +47,13 @@ port; in dev, Vite proxies `/api` to the server (`client/vite.config.ts`).
 - `/api/auth/login` and `/api/auth/login/passkey/verify` are rate-limited
   (`express-rate-limit`, 10 attempts / 15 min per IP) — a deliberate fix for
   an online brute-force gap, don't strip it out when touching those routes.
+- `ProfilePicker` (`client/src/pages/ProfilePicker.tsx`) behaves differently
+  depending on whether `onCancel` is passed — that's how it tells `/login`
+  apart from its embedded use as the Child Portal's "Parent sign-in" picker.
+  In the portal context it's **passkey-only**: no password form even if
+  `hasPassword`, and no credential-less auto-login even if a profile has
+  neither credential. Don't reunify these paths — the whole point is that a
+  screen a child has physical access to never offers the weaker methods.
 
 ## Chore business logic (don't break these invariants)
 
