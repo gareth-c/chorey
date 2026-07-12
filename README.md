@@ -180,4 +180,10 @@ Dockerfile                       multi-stage build (client build → server buil
 docker-compose.yml               pulls the published ghcr.io image, publishes 5152, mounts ./data
 docker-compose-local-build.yml   same, but builds the image from source instead of pulling
 DESIGN.md                        full design + API reference
+SECURITY.md                      how to report a vulnerability
 ```
+
+## Security
+
+Found a vulnerability? Please don't open a public issue — see
+[SECURITY.md](SECURITY.md) for how to report it privately.
