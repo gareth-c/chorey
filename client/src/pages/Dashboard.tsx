@@ -62,6 +62,14 @@ export default function Dashboard() {
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>("all_day");
   const [stars, setStars] = useState("1");
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{
+    name: string;
+    assignedTo: string;
+    frequency: Frequency;
+    timeOfDay: TimeOfDay;
+    stars: string;
+  } | null>(null);
   const [rulesError, setRulesError] = useState<string | null>(null);
   const [linksError, setLinksError] = useState<string | null>(null);
 
@@ -117,6 +125,42 @@ export default function Dashboard() {
     setError(null);
     try {
       await api.delete(`/chores/${id}`);
+      await load();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  function handleStartEdit(chore: AdminChore) {
+    setEditingId(chore.id);
+    setEditDraft({
+      name: chore.name,
+      assignedTo: chore.assignedTo,
+      frequency: chore.frequency,
+      timeOfDay: chore.timeOfDay,
+      stars: String(chore.stars),
+    });
+    setError(null);
+  }
+
+  function handleCancelEdit() {
+    setEditingId(null);
+    setEditDraft(null);
+  }
+
+  async function handleSaveEdit(id: string) {
+    if (!editDraft) return;
+    setError(null);
+    try {
+      await api.put(`/chores/${id}`, {
+        name: editDraft.name,
+        assignedTo: editDraft.assignedTo,
+        frequency: editDraft.frequency,
+        timeOfDay: editDraft.timeOfDay,
+        stars: parseInt(editDraft.stars, 10),
+      });
+      setEditingId(null);
+      setEditDraft(null);
       await load();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -240,31 +284,105 @@ export default function Dashboard() {
       <div className="card">
         <h2 className="mb-4 text-lg font-medium text-slate-900 dark:text-white">Chores</h2>
         <div className="mb-5 space-y-2">
-          {chores.map((chore) => (
-            <div
-              key={chore.id}
-              className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]"
-            >
-              <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-lg dark:bg-white/10">
-                  {chore.assigneeAvatar}
-                </span>
-                <div>
-                  <p className="text-sm font-medium text-slate-900 dark:text-white">
-                    {chore.name}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {chore.assigneeName} · {TIME_OF_DAY_LABELS[chore.timeOfDay]} ·{" "}
-                    {FREQUENCY_LABELS[chore.frequency]} ·{" "}
-                    <span className="text-amber-600 dark:text-amber-300">{chore.stars} ⭐</span>
-                  </p>
+          {chores.map((chore) =>
+            editingId === chore.id && editDraft ? (
+              <div
+                key={chore.id}
+                className="space-y-3 rounded-xl border border-amber-300 bg-slate-50 px-4 py-3 dark:border-amber-400/40 dark:bg-white/[0.03]"
+              >
+                <input
+                  className="input"
+                  value={editDraft.name}
+                  onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
+                  required
+                />
+                <div className="flex flex-wrap gap-3">
+                  <select
+                    className="input"
+                    value={editDraft.assignedTo}
+                    onChange={(e) => setEditDraft({ ...editDraft, assignedTo: e.target.value })}
+                  >
+                    {children.map((c) => (
+                      <option key={c.id} value={c.id} className="dark:bg-slate-900">
+                        {c.avatarEmoji} {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="input"
+                    value={editDraft.frequency}
+                    onChange={(e) =>
+                      setEditDraft({ ...editDraft, frequency: e.target.value as Frequency })
+                    }
+                  >
+                    {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
+                      <option key={value} value={value} className="dark:bg-slate-900">
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="input"
+                    value={editDraft.timeOfDay}
+                    onChange={(e) =>
+                      setEditDraft({ ...editDraft, timeOfDay: e.target.value as TimeOfDay })
+                    }
+                  >
+                    {Object.entries(TIME_OF_DAY_LABELS).map(([value, label]) => (
+                      <option key={value} value={value} className="dark:bg-slate-900">
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    className="input w-24"
+                    value={editDraft.stars}
+                    onChange={(e) => setEditDraft({ ...editDraft, stars: e.target.value })}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button className="btn-primary" onClick={() => handleSaveEdit(chore.id)}>
+                    Save
+                  </button>
+                  <button className="btn-secondary" onClick={handleCancelEdit}>
+                    Cancel
+                  </button>
                 </div>
               </div>
-              <button className="btn-danger" onClick={() => handleDeleteChore(chore.id)}>
-                Delete
-              </button>
-            </div>
-          ))}
+            ) : (
+              <div
+                key={chore.id}
+                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-lg dark:bg-white/10">
+                    {chore.assigneeAvatar}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      {chore.name}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {chore.assigneeName} · {TIME_OF_DAY_LABELS[chore.timeOfDay]} ·{" "}
+                      {FREQUENCY_LABELS[chore.frequency]} ·{" "}
+                      <span className="text-amber-600 dark:text-amber-300">{chore.stars} ⭐</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button className="btn-secondary" onClick={() => handleStartEdit(chore)}>
+                    Edit
+                  </button>
+                  <button className="btn-danger" onClick={() => handleDeleteChore(chore.id)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )
+          )}
           {chores.length === 0 && (
             <p className="text-sm text-slate-500 dark:text-slate-400">No chores yet.</p>
           )}
