@@ -11,6 +11,7 @@ import {
 } from "./timezone";
 
 export type Frequency = "daily" | "weekly" | "monthly";
+export type TimeOfDay = "all_day" | "morning" | "afternoon" | "evening";
 
 interface ChoreRow {
   id: string;
@@ -18,6 +19,7 @@ interface ChoreRow {
   assigned_to: string;
   frequency: Frequency;
   stars: number;
+  time_of_day: TimeOfDay;
   created_at: string;
   updated_at: string;
 }
@@ -172,6 +174,7 @@ export interface ChoreWithStatus {
   assigneeName?: string;
   assigneeAvatar?: string;
   frequency: Frequency;
+  timeOfDay: TimeOfDay;
   stars: number;
   doneThisPeriod: boolean;
 }
@@ -194,6 +197,7 @@ export function listChoresForUser(userId: string): ChoreWithStatus[] {
     name: c.name,
     assignedTo: c.assigned_to,
     frequency: c.frequency,
+    timeOfDay: c.time_of_day,
     stars: c.stars,
     doneThisPeriod: isDoneThisPeriod(c, now, timeZone),
   }));
@@ -217,6 +221,7 @@ export function listAllChoresWithStatus(): ChoreWithStatus[] {
     assigneeName: c.assignee_name,
     assigneeAvatar: c.assignee_avatar,
     frequency: c.frequency,
+    timeOfDay: c.time_of_day,
     stars: c.stars,
     doneThisPeriod: isDoneThisPeriod(c, now, timeZone),
   }));

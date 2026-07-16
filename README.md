@@ -45,8 +45,11 @@ It has two distinct surfaces:
   shared device.
 
 Each chore is **daily**, **weekly**, or **monthly** — it can only be completed
-again once the current period rolls over. Both surfaces show a Monday–Sunday
-day strip for the current week and a summary of past completed weeks (total
+again once the current period rolls over — and belongs to a **time of day**
+(All Day, Morning, Afternoon, or Evening) that the parent sets. The Child
+Portal groups a kid's chores under those headings, showing only the ones
+that actually have chores in them. Both surfaces show a Monday–Sunday day
+strip for the current week and a summary of past completed weeks (total
 stars and whether the reward threshold was hit) — 4 weeks by default, and how
 many is a household setting.
 

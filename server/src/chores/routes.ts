@@ -41,6 +41,7 @@ const choreSchema = z.object({
   name: z.string().min(1).max(200),
   assignedTo: z.string(),
   frequency: z.enum(["daily", "weekly", "monthly"]),
+  timeOfDay: z.enum(["all_day", "morning", "afternoon", "evening"]).default("all_day"),
   stars: z.number().int().min(1).max(100),
 });
 
@@ -59,7 +60,7 @@ export function registerRoutes(router: Router) {
       res.status(400).json({ error: parsed.error.flatten() });
       return;
     }
-    const { name, assignedTo, frequency, stars } = parsed.data;
+    const { name, assignedTo, frequency, timeOfDay, stars } = parsed.data;
     const child = getUser(assignedTo);
     if (!child || child.role !== "child") {
       res.status(400).json({ error: "assignedTo must be an existing Child profile" });
@@ -67,8 +68,8 @@ export function registerRoutes(router: Router) {
     }
     const id = nanoid();
     db.prepare(
-      "INSERT INTO chores (id, name, assigned_to, frequency, stars) VALUES (?, ?, ?, ?, ?)"
-    ).run(id, name, assignedTo, frequency, stars);
+      "INSERT INTO chores (id, name, assigned_to, frequency, time_of_day, stars) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(id, name, assignedTo, frequency, timeOfDay, stars);
     res.status(201).json({ ok: true, id });
   });
 
@@ -83,16 +84,16 @@ export function registerRoutes(router: Router) {
       res.status(400).json({ error: parsed.error.flatten() });
       return;
     }
-    const { name, assignedTo, frequency, stars } = parsed.data;
+    const { name, assignedTo, frequency, timeOfDay, stars } = parsed.data;
     const child = getUser(assignedTo);
     if (!child || child.role !== "child") {
       res.status(400).json({ error: "assignedTo must be an existing Child profile" });
       return;
     }
     db.prepare(
-      `UPDATE chores SET name = ?, assigned_to = ?, frequency = ?, stars = ?, updated_at = datetime('now')
+      `UPDATE chores SET name = ?, assigned_to = ?, frequency = ?, time_of_day = ?, stars = ?, updated_at = datetime('now')
        WHERE id = ?`
-    ).run(name, assignedTo, frequency, stars, existing.id);
+    ).run(name, assignedTo, frequency, timeOfDay, stars, existing.id);
     res.json({ ok: true });
   });
 

@@ -27,9 +27,12 @@ surfaces** rather than one role-branching app:
   access to and a typed password can be watched or guessed.
 
 Each chore can be **daily**, **weekly**, or **monthly** — completing it
-again is only possible once the current period rolls over. Everyone (a
-parent viewing a child's card in the management interface, or the child
-themselves in the Portal) can see:
+again is only possible once the current period rolls over. Each chore also
+has a **time of day** (All Day, Morning, Afternoon, or Evening), set by the
+parent when creating it; the Child Portal groups a child's chores under
+those headings instead of by frequency, and only shows a heading that
+actually has chores under it. Everyone (a parent viewing a child's card in
+the management interface, or the child themselves in the Portal) can see:
 - a **Monday–Sunday day strip** for the current week, with future days
   greyed out
 - a **previous-weeks summary**: the last 4 completed weeks (each ending
@@ -93,6 +96,8 @@ CREATE TABLE IF NOT EXISTS chores (
   name TEXT NOT NULL,
   assigned_to TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   frequency TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly')),
+  time_of_day TEXT NOT NULL DEFAULT 'all_day'
+    CHECK (time_of_day IN ('all_day', 'morning', 'afternoon', 'evening')),
   stars INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -142,9 +147,11 @@ CREATE TABLE IF NOT EXISTS reward_rule_history (
 Split across `server/src/db/migrations/0001_init.sql` (users + sessions),
 `0002_chore_tracker.sql` (chores/completions/reward rules/portal links),
 `0003_webauthn.sql` (the two passkey tables above), `0004_settings.sql`
-(`app_settings`), and `0005_reward_rule_history.sql` (`reward_rule_history`,
-backfilled for existing rows — see the nuance below), applied by a tiny
-numbered-migration runner (`db/migrate.ts`).
+(`app_settings`), `0005_reward_rule_history.sql` (`reward_rule_history`,
+backfilled for existing rows — see the nuance below), and
+`0006_chore_time_of_day.sql` (`chores.time_of_day`, defaulted to `'all_day'`
+so existing chores need no backfill), applied by a tiny numbered-migration
+runner (`db/migrate.ts`).
 
 **Important nuance**: `WeekSummary.threshold` (§4.2) is **not** simply "today's
 goal" anymore, but it isn't a full historical snapshot either — the split is
@@ -179,6 +186,7 @@ server/src/
       0003_webauthn.sql
       0004_settings.sql
       0005_reward_rule_history.sql
+      0006_chore_time_of_day.sql
   auth/
     password.ts               # bcrypt hash/verify
     session.ts                 # cookie-based session create/destroy/lookup
@@ -397,7 +405,7 @@ routes are deliberately public — the token in the URL *is* the credential.
 | POST | `/api/users/:id/passkey/register/verify` | self or parent, **target must be a Parent** | `{response}` → saves the credential |
 | DELETE | `/api/users/:id/passkey` | self or parent, **target must be a Parent** | removes all of that profile's passkeys |
 | GET | `/api/chores` | parent | all chores (children never call this — see §1) |
-| POST | `/api/chores` | parent | `{name, assignedTo, frequency, stars}` |
+| POST | `/api/chores` | parent | `{name, assignedTo, frequency, timeOfDay, stars}` — `timeOfDay` defaults to `"all_day"` |
 | PUT | `/api/chores/:id` | parent | same body as POST |
 | DELETE | `/api/chores/:id` | parent | |
 | POST | `/api/chores/:id/toggle` | parent | returns `{completed, progress}` — Child completions go through `/api/portal/*` instead |
@@ -477,6 +485,7 @@ interface ChoreItem {
   id: string;
   name: string;
   frequency: "daily" | "weekly" | "monthly";
+  timeOfDay: "all_day" | "morning" | "afternoon" | "evening";
   stars: number;
   doneThisPeriod: boolean;
 }
@@ -496,6 +505,14 @@ It has **no data-fetching of its own** — both call sites own their fetch
 loop and pass data + an `onToggle` callback down. That's what makes it safe
 to reuse for the token-authenticated Child Portal without leaking session-based
 fetch logic into a public page.
+
+Chores are grouped and rendered under `timeOfDay` headings, in the fixed
+order Morning → Afternoon → Evening → All Day (chronological through the
+day, with the flexible "anytime" bucket last) — not DB insertion order and
+not alphabetical. A heading only renders if at least one chore in `chores`
+has that `timeOfDay`; frequency is shown as a small label under the chore's
+name instead of as its own heading (that was frequency's role before
+time-of-day grouping was added).
 
 `WeeklyHistory` (`client/src/chores/WeeklyHistory.tsx`) takes just
 `{ weeks: WeekSummary[] }` and renders:

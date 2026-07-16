@@ -4,6 +4,7 @@ export interface ChoreItem {
   id: string;
   name: string;
   frequency: "daily" | "weekly" | "monthly";
+  timeOfDay: "all_day" | "morning" | "afternoon" | "evening";
   stars: number;
   doneThisPeriod: boolean;
 }
@@ -24,7 +25,22 @@ const FREQUENCY_LABELS: Record<ChoreItem["frequency"], string> = {
   monthly: "Monthly",
 };
 
-const FREQUENCY_ORDER: ChoreItem["frequency"][] = ["daily", "weekly", "monthly"];
+// Chronological through the day, with the flexible "anytime" bucket last.
+const TIME_OF_DAY_ORDER: ChoreItem["timeOfDay"][] = ["morning", "afternoon", "evening", "all_day"];
+
+const TIME_OF_DAY_LABELS: Record<ChoreItem["timeOfDay"], string> = {
+  morning: "Morning",
+  afternoon: "Afternoon",
+  evening: "Evening",
+  all_day: "All Day",
+};
+
+const TIME_OF_DAY_EMOJI: Record<ChoreItem["timeOfDay"], string> = {
+  morning: "🌅",
+  afternoon: "☀️",
+  evening: "🌙",
+  all_day: "📌",
+};
 
 export default function ChoreChecklist({
   childName,
@@ -114,13 +130,14 @@ export default function ChoreChecklist({
         <WeeklyHistory weeks={progress.weeks} />
       </div>
 
-      {FREQUENCY_ORDER.map((freq) => {
-        const items = chores.filter((c) => c.frequency === freq);
+      {TIME_OF_DAY_ORDER.map((tod) => {
+        const items = chores.filter((c) => c.timeOfDay === tod);
         if (items.length === 0) return null;
         return (
-          <div key={freq} className="mb-6">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              {FREQUENCY_LABELS[freq]}
+          <div key={tod} className="mb-6">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <span aria-hidden="true">{TIME_OF_DAY_EMOJI[tod]}</span>
+              {TIME_OF_DAY_LABELS[tod]}
             </p>
             <div className="space-y-2">
               {items.map((chore) => (
@@ -143,8 +160,13 @@ export default function ChoreChecklist({
                     >
                       ✓
                     </span>
-                    <span className="text-lg font-medium text-slate-900 dark:text-white">
-                      {chore.name}
+                    <span className="flex flex-col">
+                      <span className="text-lg font-medium text-slate-900 dark:text-white">
+                        {chore.name}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {FREQUENCY_LABELS[chore.frequency]}
+                      </span>
                     </span>
                   </span>
                   <span className="shrink-0 text-sm font-semibold text-amber-600 dark:text-amber-300">

@@ -88,6 +88,13 @@ port; in dev, Vite proxies `/api` to the server (`client/vite.config.ts`).
 - `POST /api/import` (a `chore-export.json` from a previous version) always
   creates fresh children/chores rather than merging by name — importing the
   same file twice produces duplicates, intentionally.
+- `chores.time_of_day` (`'all_day' | 'morning' | 'afternoon' | 'evening'`,
+  default `'all_day'`) governs how the Child Portal **groups** chores —
+  it's a second, independent axis from `frequency`, not a replacement for
+  it. `ChoreChecklist.tsx`'s `TIME_OF_DAY_ORDER` is a fixed display order
+  (Morning → Afternoon → Evening → All Day), not DB or alphabetical order;
+  a heading only renders when a chore actually has that `timeOfDay`. Don't
+  reuse `frequency` for this — a weekly chore can belong to any time of day.
 
 ## Conventions
 

@@ -5,6 +5,7 @@ import { type ChoreItem, type ChoreProgress } from "../chores/ChoreChecklist";
 import WeeklyHistory from "../chores/WeeklyHistory";
 
 type Frequency = ChoreItem["frequency"];
+type TimeOfDay = ChoreItem["timeOfDay"];
 
 interface AdminChore extends ChoreItem {
   assignedTo: string;
@@ -34,6 +35,13 @@ const FREQUENCY_LABELS: Record<Frequency, string> = {
   monthly: "Monthly",
 };
 
+const TIME_OF_DAY_LABELS: Record<TimeOfDay, string> = {
+  all_day: "All Day",
+  morning: "Morning",
+  afternoon: "Afternoon",
+  evening: "Evening",
+};
+
 // This is the management interface — only Parent profiles ever reach it
 // (children sign in exclusively through their own Child Portal link, see
 // pages/ChildPortal.tsx), so there's no role branch here.
@@ -51,6 +59,7 @@ export default function Dashboard() {
   const [name, setName] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [frequency, setFrequency] = useState<Frequency>("daily");
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>("all_day");
   const [stars, setStars] = useState("1");
   const [error, setError] = useState<string | null>(null);
   const [rulesError, setRulesError] = useState<string | null>(null);
@@ -92,6 +101,7 @@ export default function Dashboard() {
         name,
         assignedTo,
         frequency,
+        timeOfDay,
         stars: parseInt(stars, 10),
       });
       setName("");
@@ -244,7 +254,8 @@ export default function Dashboard() {
                     {chore.name}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {chore.assigneeName} · {FREQUENCY_LABELS[chore.frequency]} ·{" "}
+                    {chore.assigneeName} · {TIME_OF_DAY_LABELS[chore.timeOfDay]} ·{" "}
+                    {FREQUENCY_LABELS[chore.frequency]} ·{" "}
                     <span className="text-amber-600 dark:text-amber-300">{chore.stars} ⭐</span>
                   </p>
                 </div>
@@ -267,7 +278,7 @@ export default function Dashboard() {
             onChange={(e) => setName(e.target.value)}
             required
           />
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <select
               className="input"
               value={assignedTo}
@@ -285,6 +296,17 @@ export default function Dashboard() {
               onChange={(e) => setFrequency(e.target.value as Frequency)}
             >
               {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
+                <option key={value} value={value} className="dark:bg-slate-900">
+                  {label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input"
+              value={timeOfDay}
+              onChange={(e) => setTimeOfDay(e.target.value as TimeOfDay)}
+            >
+              {Object.entries(TIME_OF_DAY_LABELS).map(([value, label]) => (
                 <option key={value} value={value} className="dark:bg-slate-900">
                   {label}
                 </option>

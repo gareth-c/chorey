@@ -43,6 +43,8 @@ const importSchema = z.object({
         name: z.string().min(1).max(200),
         assignedTo: z.string(),
         frequency: z.enum(["daily", "weekly", "monthly"]),
+        // Older exports predate time-of-day — default them to "all_day".
+        timeOfDay: z.enum(["all_day", "morning", "afternoon", "evening"]).default("all_day"),
         stars: z.number().int().min(1).max(100),
         createdAt: sqliteDatetime.optional(),
         updatedAt: sqliteDatetime.optional(),
@@ -78,8 +80,8 @@ importRouter.post("/", requireRole("parent"), (req, res) => {
     "INSERT INTO users (id, name, avatar_emoji, role, password_hash) VALUES (?, ?, ?, 'child', NULL)"
   );
   const insertChore = db.prepare(
-    `INSERT INTO chores (id, name, assigned_to, frequency, stars, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, COALESCE(?, datetime('now')), COALESCE(?, datetime('now')))`
+    `INSERT INTO chores (id, name, assigned_to, frequency, time_of_day, stars, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), COALESCE(?, datetime('now')))`
   );
   const insertCompletion = db.prepare(
     `INSERT INTO chore_completions (id, chore_id, user_id, period_key, completed_at)
@@ -125,6 +127,7 @@ importRouter.post("/", requireRole("parent"), (req, res) => {
         chore.name,
         newChildId,
         chore.frequency,
+        chore.timeOfDay,
         chore.stars,
         chore.createdAt ?? null,
         chore.updatedAt ?? null
